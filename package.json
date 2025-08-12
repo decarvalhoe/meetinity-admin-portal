@@ -1,0 +1,29 @@
+{
+  "name": "meetinity-admin-portal",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "lint": "eslint src --ext ts,tsx"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.4.8",
+    "@testing-library/react": "14.2.2",
+    "@testing-library/user-event": "14.5.2",
+    "@typescript-eslint/eslint-plugin": "6.21.0",
+    "@typescript-eslint/parser": "6.21.0",
+    "@vitest/coverage-v8": "3.2.4",
+    "eslint": "8.57.1",
+    "eslint-plugin-react-hooks": "4.6.2",
+    "jsdom": "24.1.0",
+    "typescript": "5.6.3",
+    "vitest": "^3.2.4"
+  }
+}
