@@ -108,3 +108,25 @@ body {
   color: #667eea;
   margin: 0.5rem 0;
 }
+
+.user-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.user-controls input {
+  flex: 1;
+  padding: 0.5rem;
+}
+
+.user-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.user-card button {
+  margin-top: 0.5rem;
+}
