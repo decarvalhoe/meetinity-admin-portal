@@ -16,17 +16,45 @@ interface Event {
 
 function App() {
   const [activeTab, setActiveTab] = useState<'users' | 'events' | 'analytics'>('users')
-
-  const mockUsers: User[] = [
+  const [users, setUsers] = useState<User[]>([
     { id: 1, name: 'Sophie Martin', email: 'sophie@example.com', status: 'active' },
     { id: 2, name: 'Thomas Dubois', email: 'thomas@example.com', status: 'active' },
     { id: 3, name: 'Marie Leroy', email: 'marie@example.com', status: 'inactive' }
-  ]
+  ])
+  const [search, setSearch] = useState('')
 
   const mockEvents: Event[] = [
     { id: 1, title: 'Networking Night Paris', date: '2025-08-15', attendees: 45 },
     { id: 2, title: 'Tech Meetup Lyon', date: '2025-08-20', attendees: 32 }
   ]
+
+  const filteredUsers = users.filter(
+    u =>
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+  )
+  const totalUsers = users.length
+  const activeUsers = users.filter(u => u.status === 'active').length
+
+  const toggleStatus = (id: number) => {
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u
+      )
+    )
+  }
+
+  const exportCsv = () => {
+    const header = 'id,name,email,status'
+    const rows = filteredUsers.map(u => `${u.id},${u.name},${u.email},${u.status}`)
+    const blob = new Blob([`${[header, ...rows].join('\n')}`], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'users.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="admin-portal">
@@ -36,19 +64,19 @@ function App() {
       </header>
 
       <nav className="nav-tabs">
-        <button 
+        <button
           className={activeTab === 'users' ? 'active' : ''}
           onClick={() => setActiveTab('users')}
         >
-          Users ({mockUsers.length})
+          Users ({totalUsers})
         </button>
-        <button 
+        <button
           className={activeTab === 'events' ? 'active' : ''}
           onClick={() => setActiveTab('events')}
         >
           Events ({mockEvents.length})
         </button>
-        <button 
+        <button
           className={activeTab === 'analytics' ? 'active' : ''}
           onClick={() => setActiveTab('analytics')}
         >
@@ -60,12 +88,28 @@ function App() {
         {activeTab === 'users' && (
           <div className="users-section">
             <h2>User Management</h2>
+            <div className="user-controls">
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              <button onClick={exportCsv}>Export CSV</button>
+            </div>
+            <div className="user-stats">
+              <span>Total: {totalUsers}</span>
+              <span>Active: {activeUsers}</span>
+            </div>
             <div className="user-list">
-              {mockUsers.map(user => (
+              {filteredUsers.map(user => (
                 <div key={user.id} className="user-card">
                   <h3>{user.name}</h3>
                   <p>{user.email}</p>
                   <span className={`status ${user.status}`}>{user.status}</span>
+                  <button onClick={() => toggleStatus(user.id)}>
+                    {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </button>
                 </div>
               ))}
             </div>
@@ -93,7 +137,7 @@ function App() {
             <div className="stats-grid">
               <div className="stat-card">
                 <h3>Total Users</h3>
-                <p className="stat-number">{mockUsers.length}</p>
+                <p className="stat-number">{totalUsers}</p>
               </div>
               <div className="stat-card">
                 <h3>Active Events</h3>
