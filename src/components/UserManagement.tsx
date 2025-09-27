@@ -59,7 +59,7 @@ export function UserManagement() {
 
   const handleExport = async () => {
     const blob = await UserService.export({
-      search: debouncedSearch,
+      search: filters.search,
       status: filters.status,
       industry: filters.industry,
       startDate: filters.startDate,

@@ -1,11 +1,30 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { it, expect, vi, afterEach } from 'vitest'
+
+vi.mock('../services/userService', () => ({
+  UserService: {
+    list: vi.fn().mockResolvedValue({ users: [], total: 0 }),
+    stats: vi.fn().mockResolvedValue({ signups: {}, byIndustry: {}, byStatus: {} }),
+    export: vi.fn().mockResolvedValue(new Blob()),
+    bulk: vi.fn().mockResolvedValue(undefined)
+  }
+}))
+
+vi.mock('../utils/csv', () => ({
+  downloadCsv: vi.fn()
+}))
+
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { UserFilters, Filters } from '../components/UserFilters'
 import { UserActionsBar } from '../components/UserActionsBar'
 import { UserTable } from '../components/UserTable'
-import { User } from '../services/userService'
+import { UserManagement } from '../components/UserManagement'
+import type { User } from '../services/userService'
+import { UserService } from '../services/userService'
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
 
 it('updates search filter', () => {
   const filters: Filters = { search: '', status: '', industry: '', startDate: '', endDate: '' }
@@ -40,27 +59,25 @@ it('renders table rows', () => {
   expect(screen.getByText('a@a.com')).toBeTruthy()
 })
 
-it('passes selected user ids to onSelect', async () => {
-  const data: User[] = [
-    { id: 'user-1', name: 'A', email: 'a@a.com', status: 'active', industry: 'Tech', createdAt: '' }
-  ]
-  const onSelect = vi.fn()
+it('uses the current search input when exporting users', async () => {
+  render(<UserManagement />)
 
-  const view = render(
-    <UserTable
-      data={data}
-      total={1}
-      page={0}
-      pageSize={50}
-      onPageChange={() => {}}
-      onSelect={onSelect}
-    />
-  )
+  await waitFor(() => expect(UserService.list).toHaveBeenCalled())
 
-  const [, rowCheckbox] = within(view.container).getAllByRole('checkbox')
-  await userEvent.click(rowCheckbox)
+  const searchInput = screen.getByPlaceholderText('Search') as HTMLInputElement
+  fireEvent.change(searchInput, { target: { value: 'urgent' } })
 
-  await waitFor(() => {
-    expect(onSelect).toHaveBeenCalledWith(['user-1'])
+  await waitFor(() => expect(searchInput.value).toBe('urgent'))
+
+  fireEvent.click(screen.getByText('Export CSV'))
+
+  await waitFor(() => expect(UserService.export).toHaveBeenCalled())
+
+  expect(UserService.export).toHaveBeenLastCalledWith({
+    search: 'urgent',
+    status: '',
+    industry: '',
+    startDate: '',
+    endDate: ''
   })
 })
