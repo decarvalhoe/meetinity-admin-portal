@@ -56,12 +56,13 @@ export function UserTable({ data, total, page, pageSize, onPageChange, onSelect 
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel()
+    getSortedRowModel: getSortedRowModel(),
+    getRowId: row => row.id
   })
 
   React.useEffect(() => {
-    onSelect(Object.keys(rowSelection))
-  }, [rowSelection, onSelect])
+    onSelect(table.getSelectedRowModel().rows.map(row => row.original.id))
+  }, [rowSelection, onSelect, table])
 
   const pageCount = Math.ceil(total / pageSize)
 
