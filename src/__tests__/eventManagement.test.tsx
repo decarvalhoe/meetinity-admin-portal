@@ -1,6 +1,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import * as matchers from '@testing-library/jest-dom/matchers'
 
 vi.mock('../services/eventService', () => ({
@@ -14,8 +15,23 @@ vi.mock('../services/eventService', () => ({
     update: vi.fn(),
     createCategory: vi.fn(),
     updateCategory: vi.fn(),
-    deleteCategory: vi.fn()
+    deleteCategory: vi.fn(),
+    getAnalyticsSummary: vi.fn(),
+    getAttendanceAnalytics: vi.fn(),
+    getConversionAnalytics: vi.fn(),
+    getApprovalFunnel: vi.fn(),
+    getEngagementHeatmap: vi.fn()
   }
+}))
+
+vi.mock('../hooks/useWebSocket', () => ({
+  useWebSocket: () => ({
+    readyState: 3,
+    connectionAttempts: 0,
+    subscribe: () => () => {},
+    send: vi.fn(),
+    close: vi.fn()
+  })
 }))
 
 expect.extend(matchers)
@@ -42,6 +58,9 @@ const baseEvent: Event = {
 
 describe('events module', () => {
   beforeEach(() => {
+    ;(import.meta as any).env = {
+      VITE_API_BASE_URL: 'http://localhost:4000'
+    }
     ;(EventService.list as Mock).mockResolvedValue({ events: [baseEvent], total: 1 })
     ;(EventService.listCategories as Mock).mockResolvedValue([{ id: 'cat-1', name: 'Tech' }])
     ;(EventService.listTags as Mock).mockResolvedValue(['innovation'])
@@ -52,6 +71,24 @@ describe('events module', () => {
     ;(EventService.createCategory as Mock).mockResolvedValue({ id: 'cat-2', name: 'Marketing' })
     ;(EventService.updateCategory as Mock).mockResolvedValue({ id: 'cat-1', name: 'Tech+' })
     ;(EventService.deleteCategory as Mock).mockResolvedValue(undefined)
+    ;(EventService.getAnalyticsSummary as Mock).mockResolvedValue({
+      totalEvents: 1,
+      published: 0,
+      pendingApproval: 1,
+      rejected: 0,
+      averageAttendanceRate: 0.5,
+      conversionRate: 0.3
+    })
+    ;(EventService.getAttendanceAnalytics as Mock).mockResolvedValue([
+      { eventId: 'event-1', eventName: 'Salon Tech', series: [] }
+    ])
+    ;(EventService.getConversionAnalytics as Mock).mockResolvedValue([
+      { stage: 'Inscrits', value: 1 }
+    ])
+    ;(EventService.getApprovalFunnel as Mock).mockResolvedValue([
+      { stage: 'Soumis', count: 1 }
+    ])
+    ;(EventService.getEngagementHeatmap as Mock).mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -176,13 +213,16 @@ describe('events module', () => {
     const titleInput = screen.getByLabelText('Titre') as HTMLInputElement
     fireEvent.change(titleInput, { target: { value: 'Meetup produit' } })
 
-    const startDateInput = screen.getByLabelText('Date de début') as HTMLInputElement
+    const startDateInputs = screen.getAllByLabelText('Date de début')
+    const startDateInput = startDateInputs[startDateInputs.length - 1] as HTMLInputElement
     fireEvent.change(startDateInput, { target: { value: '2024-06-02T09:00' } })
 
-    const categorySelect = screen.getByLabelText('Catégorie') as HTMLSelectElement
+    const categorySelects = screen.getAllByLabelText('Catégorie')
+    const categorySelect = categorySelects[categorySelects.length - 1] as HTMLSelectElement
     fireEvent.change(categorySelect, { target: { value: 'cat-1' } })
 
-    const tagsInput = screen.getByLabelText('Tags') as HTMLInputElement
+    const tagInputs = screen.getAllByLabelText('Tags')
+    const tagsInput = tagInputs[tagInputs.length - 1] as HTMLInputElement
     fireEvent.change(tagsInput, { target: { value: 'nouveau, lancement' } })
 
     const saveButton = screen.getByRole('button', { name: 'Enregistrer' })
@@ -207,6 +247,7 @@ describe('events module', () => {
   })
 
   it('applies tags in bulk from the actions bar', async () => {
+    const user = userEvent.setup()
     const eventRows: Event[] = [
       { ...baseEvent, id: 'bulk-1', title: 'Salon 1' },
       { ...baseEvent, id: 'bulk-2', title: 'Salon 2' }
@@ -217,23 +258,24 @@ describe('events module', () => {
 
     await waitFor(() => expect(screen.getByText('Salon 1')).toBeInTheDocument())
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1])
-    fireEvent.click(checkboxes[2])
+    const selectAllCheckbox = screen.getAllByRole('checkbox')[0]
+    await user.click(selectAllCheckbox)
 
     await waitFor(() =>
       expect(
         screen
           .getAllByRole('checkbox')
-          .slice(1, 3)
+          .slice(1)
           .every(checkbox => (checkbox as HTMLInputElement).checked)
       ).toBe(true)
     )
 
-    const tagsField = screen.getByPlaceholderText('tag1, tag2') as HTMLInputElement
+    const tagsField = screen.getAllByPlaceholderText('tag1, tag2')[0] as HTMLInputElement
     fireEvent.change(tagsField, { target: { value: 'urgent, priorité' } })
 
     const applyButton = screen.getByRole('button', { name: 'Appliquer les tags' })
+    await waitFor(() => expect(applyButton).not.toBeDisabled())
+
     fireEvent.click(applyButton)
 
     await waitFor(() => expect(EventService.bulkTags).toHaveBeenCalledWith(['bulk-1', 'bulk-2'], ['urgent', 'priorité']))

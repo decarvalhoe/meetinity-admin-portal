@@ -1,0 +1,87 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Event analytics pipeline > captures reducer transformations snapshot 1`] = `
+{
+  "attendance": [
+    {
+      "eventId": "a",
+      "eventName": "Forum Product",
+      "series": [
+        {
+          "attendance": 110,
+          "date": "2024-01-01",
+          "registrations": 120,
+        },
+        {
+          "attendance": 135,
+          "date": "2024-01-02",
+          "registrations": 140,
+        },
+        {
+          "attendance": 149,
+          "date": "2024-01-03",
+          "registrations": 155,
+        },
+      ],
+    },
+  ],
+  "conversions": [
+    {
+      "stage": "Visiteurs",
+      "value": 420,
+    },
+    {
+      "stage": "Inscrits",
+      "value": 190,
+    },
+    {
+      "stage": "Présents",
+      "value": 150,
+    },
+  ],
+  "funnel": [
+    {
+      "count": 40,
+      "stage": "Soumis",
+    },
+    {
+      "count": 28,
+      "stage": "Vérification",
+    },
+    {
+      "count": 24,
+      "stage": "Approuvés",
+    },
+  ],
+  "heatmap": [
+    {
+      "day": "Lundi",
+      "hour": 9,
+      "value": 30,
+    },
+    {
+      "day": "Lundi",
+      "hour": 10,
+      "value": 50,
+    },
+    {
+      "day": "Mardi",
+      "hour": 14,
+      "value": 70,
+    },
+    {
+      "day": "Mercredi",
+      "hour": 16,
+      "value": 90,
+    },
+  ],
+  "summary": {
+    "averageAttendanceRate": 0.72,
+    "conversionRate": 0.58,
+    "pendingApproval": 4,
+    "published": 30,
+    "rejected": 6,
+    "totalEvents": 45,
+  },
+}
+`;

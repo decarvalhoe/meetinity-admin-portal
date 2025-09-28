@@ -55,6 +55,49 @@ export interface EventCategoryInput {
   color?: string
 }
 
+export interface EventAnalyticsQuery {
+  range?: '7d' | '14d' | '30d' | '90d'
+  startDate?: string
+  endDate?: string
+}
+
+export interface EventAnalyticsSummary {
+  totalEvents: number
+  published: number
+  pendingApproval: number
+  rejected: number
+  averageAttendanceRate: number
+  conversionRate: number
+}
+
+export interface EventAttendancePoint {
+  date: string
+  registrations: number
+  attendance: number
+}
+
+export interface EventAttendanceSeries {
+  eventId: string
+  eventName: string
+  series: EventAttendancePoint[]
+}
+
+export interface EventConversionStat {
+  stage: string
+  value: number
+}
+
+export interface EventApprovalStage {
+  stage: string
+  count: number
+}
+
+export interface EventEngagementCell {
+  day: string
+  hour: number
+  value: number
+}
+
 const API = import.meta.env.VITE_API_BASE_URL
 
 export const EventService = {
@@ -113,5 +156,27 @@ export const EventService = {
   },
   async deleteCategory(id: string) {
     await axios.delete(`${API}/api/events/categories/${id}`)
+  },
+  async getAnalyticsSummary(params?: EventAnalyticsQuery) {
+    const { data } = await axios.get(`${API}/api/events/analytics`, { params })
+    return data as EventAnalyticsSummary
+  },
+  async getAttendanceAnalytics(params?: EventAnalyticsQuery) {
+    const { data } = await axios.get(`${API}/api/events/attendance`, { params })
+    return data as EventAttendanceSeries[]
+  },
+  async getConversionAnalytics(params?: EventAnalyticsQuery) {
+    const { data } = await axios.get(`${API}/api/events/conversions`, { params })
+    return data as EventConversionStat[]
+  },
+  async getApprovalFunnel(params?: EventAnalyticsQuery) {
+    const { data } = await axios.get(`${API}/api/events/approval-funnel`, { params })
+    return data as EventApprovalStage[]
+  },
+  async getEngagementHeatmap(params?: EventAnalyticsQuery) {
+    const { data } = await axios.get(`${API}/api/events/engagement-heatmap`, {
+      params
+    })
+    return data as EventEngagementCell[]
   }
 }
