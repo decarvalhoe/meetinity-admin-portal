@@ -1,4 +1,11 @@
 import { it, expect, vi, afterEach, Mock } from 'vitest'
+import '@testing-library/jest-dom/vitest'
+
+vi.mock('react-chartjs-2', () => ({
+  Bar: () => null,
+  Pie: () => null,
+  Line: () => null
+}))
 
 vi.mock('../services/userService', () => ({
   UserService: {
@@ -13,7 +20,7 @@ vi.mock('../utils/csv', () => ({
   downloadCsv: vi.fn()
 }))
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import React from 'react'
 import { UserFilters, Filters } from '../components/UserFilters'
 import { UserActionsBar } from '../components/UserActionsBar'
@@ -23,6 +30,7 @@ import type { User } from '../services/userService'
 import { UserService } from '../services/userService'
 
 afterEach(() => {
+  cleanup()
   vi.clearAllMocks()
 })
 
@@ -131,4 +139,74 @@ it('uses the current search input when exporting users', async () => {
     startDate: '',
     endDate: ''
   })
+})
+
+it('corrects the current page when total decreases after deletion', async () => {
+  const listMock = UserService.list as Mock
+  const responses = [
+    {
+      expectedPage: 0,
+      users: [
+        { id: 'u1', name: 'User 1', email: 'user1@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+      ],
+      total: 120
+    },
+    {
+      expectedPage: 1,
+      users: [
+        { id: 'u51', name: 'User 51', email: 'user51@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+      ],
+      total: 120
+    },
+    {
+      expectedPage: 2,
+      users: [
+        { id: 'u101', name: 'User 101', email: 'user101@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+      ],
+      total: 120
+    },
+    {
+      expectedPage: 2,
+      users: [],
+      total: 60
+    },
+    {
+      expectedPage: 1,
+      users: [
+        { id: 'u51', name: 'User 51', email: 'user51@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+      ],
+      total: 60
+    }
+  ]
+
+  let callIndex = 0
+  listMock.mockImplementation(async ({ page }) => {
+    const response = responses[Math.min(callIndex, responses.length - 1)]
+    callIndex += 1
+    expect(page).toBe(response.expectedPage)
+    return { users: response.users, total: response.total }
+  })
+
+  render(<UserManagement />)
+
+  await waitFor(() => expect(screen.getByText('user1@example.com')).toBeInTheDocument())
+
+  const nextButton = screen.getByText('Next')
+  fireEvent.click(nextButton)
+  await waitFor(() => expect(screen.getByText('user51@example.com')).toBeInTheDocument())
+
+  fireEvent.click(nextButton)
+  await waitFor(() => expect(screen.getByText('user101@example.com')).toBeInTheDocument())
+
+  const rowCheckbox = screen.getAllByRole('checkbox')[1] as HTMLInputElement
+  fireEvent.click(rowCheckbox)
+  await waitFor(() => expect(rowCheckbox).toBeChecked())
+
+  fireEvent.click(screen.getByText('Delete'))
+
+  await waitFor(() => expect(UserService.bulk).toHaveBeenCalledWith(['u101'], 'delete'))
+
+  await waitFor(() => expect(screen.getByText('user51@example.com')).toBeInTheDocument())
+  expect(screen.queryByText('user101@example.com')).not.toBeInTheDocument()
+  expect(screen.getByText('Page 2 / 2')).toBeInTheDocument()
 })

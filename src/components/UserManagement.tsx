@@ -37,6 +37,7 @@ export function UserManagement() {
     })
     setUsers(res.users)
     setTotal(res.total)
+    return res
   }
 
   const loadStats = async () => {
@@ -45,8 +46,16 @@ export function UserManagement() {
   }
 
   useEffect(() => {
-    loadUsers()
-  }, [page, debouncedSearch, filters.status, filters.industry, filters.startDate, filters.endDate])
+    const refresh = async () => {
+      const res = await loadUsers()
+      const maxPage = Math.max(0, Math.ceil(res.total / pageSize) - 1)
+      if (page > maxPage) {
+        setPage(maxPage)
+      }
+    }
+
+    refresh()
+  }, [page, debouncedSearch, filters.status, filters.industry, filters.startDate, filters.endDate, pageSize, setPage])
 
   useEffect(() => {
     loadStats()
@@ -56,7 +65,11 @@ export function UserManagement() {
     await UserService.bulk(selected, action)
     setSelected([])
     setSelectionResetKey(prev => prev + 1)
-    await loadUsers()
+    const res = await loadUsers()
+    const maxPage = Math.max(0, Math.ceil(res.total / pageSize) - 1)
+    if (page > maxPage) {
+      setPage(maxPage)
+    }
     try {
       await loadStats()
     } catch (error) {
