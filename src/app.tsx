@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { UserManagement } from './components/UserManagement'
+import { EventManagement } from './components/events/EventManagement'
 import { AuthProvider, usePermissions } from './hooks/usePermissions'
 import { AdminLayout } from './components/layout/AdminLayout'
 import { ADMIN_MODULES } from './utils/adminNavigation'
@@ -87,6 +88,8 @@ export default function App() {
                   >
                     {module.path === 'users' ? (
                       <UserManagement />
+                    ) : module.path === 'events' ? (
+                      <EventManagement />
                     ) : (
                       <ModulePlaceholder title={module.label} description={module.description} />
                     )}
@@ -94,6 +97,14 @@ export default function App() {
                 }
               />
             ))}
+            <Route
+              path="events/requests"
+              element={
+                <RequirePermissions requiredPermissions={['admin:access', 'events:approve']}>
+                  <EventManagement initialFilters={{ status: 'pending' }} lockedStatus="pending" />
+                </RequirePermissions>
+              }
+            />
           </Route>
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
