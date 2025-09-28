@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { User, UserService } from '../services/userService'
 import { UserFilters, Filters } from './UserFilters'
 import { UserTable } from './UserTable'
@@ -25,7 +25,12 @@ export function UserManagement() {
   const debouncedSearch = useDebounce(filters.search)
   const { page, pageSize, setPage } = usePagination(50)
 
-  const loadUsers = async () => {
+  const requestIdRef = useRef(0)
+
+  const loadUsers = useCallback(async () => {
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+
     const res = await UserService.list({
       page,
       pageSize,
@@ -35,9 +40,22 @@ export function UserManagement() {
       startDate: filters.startDate,
       endDate: filters.endDate
     })
+
+    if (requestId !== requestIdRef.current) {
+      return
+    }
+
     setUsers(res.users)
     setTotal(res.total)
-  }
+  }, [
+    page,
+    pageSize,
+    debouncedSearch,
+    filters.status,
+    filters.industry,
+    filters.startDate,
+    filters.endDate
+  ])
 
   const loadStats = async () => {
     const data = await UserService.stats()
@@ -45,8 +63,8 @@ export function UserManagement() {
   }
 
   useEffect(() => {
-    loadUsers()
-  }, [page, debouncedSearch, filters.status, filters.industry, filters.startDate, filters.endDate])
+    void loadUsers()
+  }, [loadUsers])
 
   useEffect(() => {
     loadStats()
