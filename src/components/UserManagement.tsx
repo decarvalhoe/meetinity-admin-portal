@@ -7,6 +7,7 @@ import { UserStats } from './UserStats'
 import { useDebounce } from '../hooks/useDebounce'
 import { usePagination } from '../hooks/usePagination'
 import { downloadCsv } from '../utils/csv'
+import { UserAnalyticsDashboard } from './users/UserAnalyticsDashboard'
 
 export function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
@@ -14,6 +15,7 @@ export function UserManagement() {
   const [stats, setStats] = useState({ signups: {}, byIndustry: {}, byStatus: {} })
   const [selected, setSelected] = useState<string[]>([])
   const [selectionResetKey, setSelectionResetKey] = useState(0)
+  const [activeTab, setActiveTab] = useState<'summary' | 'analytics'>('summary')
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status: '',
@@ -129,7 +131,25 @@ export function UserManagement() {
         onSelect={setSelected}
         clearSelectionKey={selectionResetKey}
       />
-      <UserStats stats={stats} />
+      <div className="user-management-tabs">
+        <button
+          type="button"
+          className={activeTab === 'summary' ? 'active' : ''}
+          onClick={() => setActiveTab('summary')}
+          data-testid="user-tab-summary"
+        >
+          Statistiques globales
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'analytics' ? 'active' : ''}
+          onClick={() => setActiveTab('analytics')}
+          data-testid="user-tab-analytics"
+        >
+          Analyse approfondie
+        </button>
+      </div>
+      {activeTab === 'summary' ? <UserStats stats={stats} /> : <UserAnalyticsDashboard />}
     </div>
   )
 }
