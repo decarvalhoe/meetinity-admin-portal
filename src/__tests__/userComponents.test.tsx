@@ -78,6 +78,8 @@ it('clears selection in table after bulk action', async () => {
 
   await waitFor(() => expect(UserService.bulk).toHaveBeenCalledWith(['1'], 'deactivate'))
 
+  await waitFor(() => expect(UserService.stats).toHaveBeenCalledTimes(2))
+
   await waitFor(() => expect(getRowCheckbox()).not.toBeChecked())
 })
 

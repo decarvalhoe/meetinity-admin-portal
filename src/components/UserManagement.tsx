@@ -56,7 +56,12 @@ export function UserManagement() {
     await UserService.bulk(selected, action)
     setSelected([])
     setSelectionResetKey(prev => prev + 1)
-    loadUsers()
+    await loadUsers()
+    try {
+      await loadStats()
+    } catch (error) {
+      console.error('Failed to refresh user stats', error)
+    }
   }
 
   const handleExport = async () => {
