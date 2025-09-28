@@ -1,4 +1,4 @@
-import { it, expect, vi, afterEach } from 'vitest'
+import { it, expect, vi, afterEach, Mock } from 'vitest'
 
 vi.mock('../services/userService', () => ({
   UserService: {
@@ -57,6 +57,28 @@ it('renders table rows', () => {
     />
   )
   expect(screen.getByText('a@a.com')).toBeTruthy()
+})
+
+it('clears selection in table after bulk action', async () => {
+  const users: User[] = [
+    { id: '1', name: 'Alice', email: 'alice@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+  ]
+  ;(UserService.list as Mock).mockResolvedValue({ users, total: users.length })
+
+  render(<UserManagement />)
+
+  await waitFor(() => expect(screen.getByText('alice@example.com')).toBeInTheDocument())
+
+  const getRowCheckbox = () => screen.getAllByRole('checkbox')[1] as HTMLInputElement
+  fireEvent.click(getRowCheckbox())
+
+  await waitFor(() => expect(getRowCheckbox()).toBeChecked())
+
+  fireEvent.click(screen.getByText('Deactivate'))
+
+  await waitFor(() => expect(UserService.bulk).toHaveBeenCalledWith(['1'], 'deactivate'))
+
+  await waitFor(() => expect(getRowCheckbox()).not.toBeChecked())
 })
 
 it('uses the current search input when exporting users', async () => {
