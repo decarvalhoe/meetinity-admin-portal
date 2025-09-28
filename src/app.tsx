@@ -5,6 +5,7 @@ import { EventManagement } from './components/events/EventManagement'
 import { AuthProvider, usePermissions } from './hooks/usePermissions'
 import { AdminLayout } from './components/layout/AdminLayout'
 import { ADMIN_MODULES } from './utils/adminNavigation'
+import { ModerationDashboard } from './components/moderation/ModerationDashboard'
 
 interface RequirePermissionsProps {
   requiredPermissions?: string[]
@@ -90,6 +91,8 @@ export default function App() {
                       <UserManagement />
                     ) : module.path === 'events' ? (
                       <EventManagement />
+                    ) : module.path === 'moderation' ? (
+                      <ModerationDashboard />
                     ) : (
                       <ModulePlaceholder title={module.label} description={module.description} />
                     )}
