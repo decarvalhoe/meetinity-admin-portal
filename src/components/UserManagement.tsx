@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { User, UserService } from '../services/userService'
 import { UserFilters, Filters } from './UserFilters'
 import { UserTable } from './UserTable'
@@ -25,7 +25,12 @@ export function UserManagement() {
   const debouncedSearch = useDebounce(filters.search)
   const { page, pageSize, setPage } = usePagination(50)
 
-  const loadUsers = async () => {
+  const requestIdRef = useRef(0)
+
+  const loadUsers = useCallback(async () => {
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+
     const res = await UserService.list({
       page,
       pageSize,
@@ -35,10 +40,23 @@ export function UserManagement() {
       startDate: filters.startDate,
       endDate: filters.endDate
     })
+
+    if (requestId !== requestIdRef.current) {
+      return
+    }
+
     setUsers(res.users)
     setTotal(res.total)
     return res
-  }
+  }, [
+    page,
+    pageSize,
+    debouncedSearch,
+    filters.status,
+    filters.industry,
+    filters.startDate,
+    filters.endDate
+  ])
 
   const loadStats = async () => {
     const data = await UserService.stats()
@@ -48,14 +66,16 @@ export function UserManagement() {
   useEffect(() => {
     const refresh = async () => {
       const res = await loadUsers()
-      const maxPage = Math.max(0, Math.ceil(res.total / pageSize) - 1)
-      if (page > maxPage) {
-        setPage(maxPage)
+      if (res) {
+        const maxPage = Math.max(0, Math.ceil(res.total / pageSize) - 1)
+        if (page > maxPage) {
+          setPage(maxPage)
+        }
       }
     }
 
     refresh()
-  }, [page, debouncedSearch, filters.status, filters.industry, filters.startDate, filters.endDate, pageSize, setPage])
+  }, [loadUsers, page, pageSize, setPage])
 
   useEffect(() => {
     loadStats()
@@ -66,9 +86,11 @@ export function UserManagement() {
     setSelected([])
     setSelectionResetKey(prev => prev + 1)
     const res = await loadUsers()
-    const maxPage = Math.max(0, Math.ceil(res.total / pageSize) - 1)
-    if (page > maxPage) {
-      setPage(maxPage)
+    if (res) {
+      const maxPage = Math.max(0, Math.ceil(res.total / pageSize) - 1)
+      if (page > maxPage) {
+        setPage(maxPage)
+      }
     }
     try {
       await loadStats()

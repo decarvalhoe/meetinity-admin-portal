@@ -1,5 +1,5 @@
 import { it, expect, vi, afterEach, Mock } from 'vitest'
-import '@testing-library/jest-dom/vitest'
+import * as matchers from '@testing-library/jest-dom/matchers'
 
 vi.mock('react-chartjs-2', () => ({
   Bar: () => null,
@@ -20,7 +20,9 @@ vi.mock('../utils/csv', () => ({
   downloadCsv: vi.fn()
 }))
 
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+expect.extend(matchers)
+
+import { render, screen, fireEvent, waitFor, act, within, cleanup } from '@testing-library/react'
 import React from 'react'
 import { UserFilters, Filters } from '../components/UserFilters'
 import { UserActionsBar } from '../components/UserActionsBar'
@@ -33,6 +35,16 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
 })
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
 
 it('updates search filter', () => {
   const filters: Filters = { search: '', status: '', industry: '', startDate: '', endDate: '' }
@@ -82,8 +94,8 @@ it('disables pagination when there are no users', () => {
 
   expect(screen.getByText('No pages available')).toBeInTheDocument()
 
-  const prevButton = screen.getByText('Prev') as HTMLButtonElement
-  const nextButton = screen.getByText('Next') as HTMLButtonElement
+  const prevButton = screen.getAllByRole('button', { name: 'Prev' })[0] as HTMLButtonElement
+  const nextButton = screen.getAllByRole('button', { name: 'Next' })[0] as HTMLButtonElement
 
   expect(prevButton).toBeDisabled()
   expect(nextButton).toBeDisabled()
@@ -100,16 +112,20 @@ it('clears selection in table after bulk action', async () => {
   ]
   ;(UserService.list as Mock).mockResolvedValue({ users, total: users.length })
 
-  render(<UserManagement />)
+  const { container } = render(<UserManagement />, { legacyRoot: true })
 
-  await waitFor(() => expect(screen.getByText('alice@example.com')).toBeInTheDocument())
+  const tables = container.querySelectorAll('.user-table')
+  const targetTable = tables[tables.length - 1] as HTMLElement
+  await waitFor(() => expect(within(targetTable).getByText('alice@example.com')).toBeInTheDocument())
 
-  const getRowCheckbox = () => screen.getAllByRole('checkbox')[1] as HTMLInputElement
+  const getRowCheckbox = () => within(targetTable).getAllByRole('checkbox')[1] as HTMLInputElement
   fireEvent.click(getRowCheckbox())
 
   await waitFor(() => expect(getRowCheckbox()).toBeChecked())
 
-  fireEvent.click(screen.getByText('Deactivate'))
+  const actions = container.querySelectorAll('.user-actions')
+  const targetActions = actions[actions.length - 1] as HTMLElement
+  fireEvent.click(within(targetActions).getByRole('button', { name: 'Deactivate' }))
 
   await waitFor(() => expect(UserService.bulk).toHaveBeenCalledWith(['1'], 'deactivate'))
 
@@ -119,16 +135,20 @@ it('clears selection in table after bulk action', async () => {
 })
 
 it('uses the current search input when exporting users', async () => {
-  render(<UserManagement />)
+  const { container } = render(<UserManagement />, { legacyRoot: true })
 
   await waitFor(() => expect(UserService.list).toHaveBeenCalled())
 
-  const searchInput = screen.getByPlaceholderText('Search') as HTMLInputElement
+  const filters = container.querySelectorAll('.user-filters')
+  const targetFilters = filters[filters.length - 1] as HTMLElement
+  const searchInput = within(targetFilters).getByPlaceholderText('Search') as HTMLInputElement
   fireEvent.change(searchInput, { target: { value: 'urgent' } })
 
   await waitFor(() => expect(searchInput.value).toBe('urgent'))
 
-  fireEvent.click(screen.getByText('Export CSV'))
+  const actions = container.querySelectorAll('.user-actions')
+  const targetActions = actions[actions.length - 1] as HTMLElement
+  fireEvent.click(within(targetActions).getByText('Export CSV'))
 
   await waitFor(() => expect(UserService.export).toHaveBeenCalled())
 
@@ -209,4 +229,72 @@ it('corrects the current page when total decreases after deletion', async () => 
   await waitFor(() => expect(screen.getByText('user51@example.com')).toBeInTheDocument())
   expect(screen.queryByText('user101@example.com')).not.toBeInTheDocument()
   expect(screen.getByText('Page 2 / 2')).toBeInTheDocument()
+})
+
+it('only updates the user list from the most recent response', async () => {
+  type ListResponse = { users: User[]; total: number }
+  const requests: Array<{
+    deferred: ReturnType<typeof createDeferred<ListResponse>>
+    params: Parameters<typeof UserService.list>[0]
+  }> = []
+
+  ;(UserService.list as Mock).mockImplementation(params => {
+    const deferred = createDeferred<ListResponse>()
+    requests.push({ deferred, params })
+    return deferred.promise
+  })
+
+  const { container } = render(<UserManagement />, { legacyRoot: true })
+
+  await waitFor(() => expect(requests.length).toBeGreaterThan(0))
+
+  const filters = container.querySelectorAll('.user-filters')
+  const targetFilters = filters[filters.length - 1] as HTMLElement
+  const statusSelect = within(targetFilters)
+    .getAllByRole('combobox')
+    .find((element): element is HTMLSelectElement =>
+      Array.from((element as HTMLSelectElement).options).some(option => option.value === 'active')
+    )
+
+  if (!statusSelect) {
+    throw new Error('Status select not found')
+  }
+
+  fireEvent.change(statusSelect, { target: { value: 'active' } })
+
+  await waitFor(() => expect(requests.some(req => req.params.status === 'active')).toBe(true))
+
+  const entriesWithIndex = requests.map((entry, index) => ({ ...entry, index }))
+  const latestActiveEntry = entriesWithIndex.filter(entry => entry.params.status === 'active').pop() ?? entriesWithIndex[entriesWithIndex.length - 1]
+  const staleEntries = entriesWithIndex.filter(entry => entry.index !== latestActiveEntry.index)
+
+  const tables = container.querySelectorAll('.user-table')
+  const targetTable = tables[tables.length - 1] as HTMLElement
+  const tableWithin = within(targetTable)
+
+  for (const entry of staleEntries) {
+    await act(async () => {
+      entry.deferred.resolve({
+        users: [
+          { id: '1', name: 'First', email: 'first@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+        ],
+        total: 1
+      })
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(tableWithin.queryByText('first@example.com')).not.toBeInTheDocument())
+  }
+
+  await act(async () => {
+    latestActiveEntry.deferred.resolve({
+      users: [
+        { id: '2', name: 'Second', email: 'second@example.com', status: 'active', industry: 'Tech', createdAt: '' }
+      ],
+      total: 1
+    })
+    await Promise.resolve()
+  })
+
+  await waitFor(() => expect(tableWithin.getByText('second@example.com')).toBeInTheDocument())
 })
