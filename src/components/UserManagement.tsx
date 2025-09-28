@@ -13,6 +13,7 @@ export function UserManagement() {
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState({ signups: {}, byIndustry: {}, byStatus: {} })
   const [selected, setSelected] = useState<string[]>([])
+  const [selectionResetKey, setSelectionResetKey] = useState(0)
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status: '',
@@ -54,6 +55,7 @@ export function UserManagement() {
   const handleAction = async (action: 'activate' | 'deactivate' | 'delete') => {
     await UserService.bulk(selected, action)
     setSelected([])
+    setSelectionResetKey(prev => prev + 1)
     loadUsers()
   }
 
@@ -85,6 +87,7 @@ export function UserManagement() {
         pageSize={pageSize}
         onPageChange={setPage}
         onSelect={setSelected}
+        clearSelectionKey={selectionResetKey}
       />
       <UserStats stats={stats} />
     </div>

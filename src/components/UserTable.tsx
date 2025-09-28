@@ -15,9 +15,18 @@ interface Props {
   pageSize: number
   onPageChange: (page: number) => void
   onSelect: (ids: string[]) => void
+  clearSelectionKey?: number
 }
 
-export function UserTable({ data, total, page, pageSize, onPageChange, onSelect }: Props) {
+export function UserTable({
+  data,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onSelect,
+  clearSelectionKey
+}: Props) {
   const [rowSelection, setRowSelection] = React.useState({})
 
   const columns = React.useMemo<ColumnDef<User>[]>(
@@ -59,6 +68,12 @@ export function UserTable({ data, total, page, pageSize, onPageChange, onSelect 
     getSortedRowModel: getSortedRowModel(),
     getRowId: row => row.id
   })
+
+  React.useEffect(() => {
+    if (clearSelectionKey !== undefined) {
+      setRowSelection({})
+    }
+  }, [clearSelectionKey])
 
   React.useEffect(() => {
     onSelect(table.getSelectedRowModel().rows.map(row => row.original.id))
