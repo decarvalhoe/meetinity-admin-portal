@@ -59,6 +59,33 @@ it('renders table rows', () => {
   expect(screen.getByText('a@a.com')).toBeTruthy()
 })
 
+it('disables pagination when there are no users', () => {
+  const onPageChange = vi.fn()
+  render(
+    <UserTable
+      data={[]}
+      total={0}
+      page={0}
+      pageSize={50}
+      onPageChange={onPageChange}
+      onSelect={() => {}}
+    />
+  )
+
+  expect(screen.getByText('No pages available')).toBeInTheDocument()
+
+  const prevButton = screen.getByText('Prev') as HTMLButtonElement
+  const nextButton = screen.getByText('Next') as HTMLButtonElement
+
+  expect(prevButton).toBeDisabled()
+  expect(nextButton).toBeDisabled()
+
+  fireEvent.click(prevButton)
+  fireEvent.click(nextButton)
+
+  expect(onPageChange).not.toHaveBeenCalled()
+})
+
 it('clears selection in table after bulk action', async () => {
   const users: User[] = [
     { id: '1', name: 'Alice', email: 'alice@example.com', status: 'active', industry: 'Tech', createdAt: '' }
