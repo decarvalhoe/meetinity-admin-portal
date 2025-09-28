@@ -79,7 +79,11 @@ export function UserTable({
     onSelect(table.getSelectedRowModel().rows.map(row => row.original.id))
   }, [rowSelection, onSelect, table])
 
-  const pageCount = Math.ceil(total / pageSize)
+  const safePageSize = pageSize > 0 ? pageSize : 1
+  const pageCount = Math.max(1, Math.ceil(total / safePageSize))
+  const hasPages = total > 0
+  const canGoPrev = hasPages && page > 0
+  const canGoNext = hasPages && page + 1 < pageCount
 
   return (
     <div className="user-table">
@@ -106,13 +110,31 @@ export function UserTable({
         </tbody>
       </table>
       <div className="pagination">
-        <button disabled={page === 0} onClick={() => onPageChange(page - 1)}>
+        <button
+          disabled={!canGoPrev}
+          onClick={() => {
+            if (canGoPrev) {
+              onPageChange(page - 1)
+            }
+          }}
+        >
           Prev
         </button>
         <span>
-          Page {page + 1} / {pageCount}
+          {hasPages ? (
+            <>Page {page + 1} / {pageCount}</>
+          ) : (
+            'No pages available'
+          )}
         </span>
-        <button disabled={page + 1 >= pageCount} onClick={() => onPageChange(page + 1)}>
+        <button
+          disabled={!canGoNext}
+          onClick={() => {
+            if (canGoNext) {
+              onPageChange(page + 1)
+            }
+          }}
+        >
           Next
         </button>
       </div>
