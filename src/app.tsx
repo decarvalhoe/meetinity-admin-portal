@@ -7,6 +7,7 @@ import { AdminLayout } from './components/layout/AdminLayout'
 import { ADMIN_MODULES } from './utils/adminNavigation'
 import { ModerationDashboard } from './components/moderation/ModerationDashboard'
 import { PlatformSettings } from './components/configuration/PlatformSettings'
+import { SecurityCenter } from './components/security/SecurityCenter'
 
 interface RequirePermissionsProps {
   requiredPermissions?: string[]
@@ -94,6 +95,8 @@ export default function App() {
                       <EventManagement />
                     ) : module.path === 'moderation' ? (
                       <ModerationDashboard />
+                    ) : module.path === 'security' ? (
+                      <SecurityCenter />
                     ) : module.path === 'configuration' ? (
                       <PlatformSettings />
                     ) : (
