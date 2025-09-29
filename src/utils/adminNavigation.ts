@@ -31,6 +31,12 @@ export const ADMIN_MODULES: AdminModuleConfig[] = [
     description: 'Analysez les indicateurs clés de la plateforme.'
   },
   {
+    path: 'configuration',
+    label: 'Configuration',
+    requiredPermissions: ['platform:config'],
+    description: 'Gérez les paramètres et l’orchestration de la plateforme.'
+  },
+  {
     path: 'settings',
     label: 'Paramètres',
     requiredPermissions: ['settings:read'],
