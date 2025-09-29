@@ -4,7 +4,14 @@ This repository contains the administration portal for the Meetinity platform, p
 
 ## Overview
 
-The admin portal is built with **React 18**, **TypeScript**, and **Vite**. It offers a modern interface for platform administrators to manage users, view analytics, and perform administrative tasks.
+The admin portal is built with **React 18**, **TypeScript**, and **Vite**. It offers a modern interface for platform administrators to manage users, view analytics, and perform administrative tasks while enforcing the Meetinity RBAC model across modules.
+
+## Delivery Status
+
+- **Overall progress**: ~85% of the functional scope has shipped to production-like environments.
+- **Delivered modules**: Users, Events, Moderation, Security, Configuration and Finance are available in the UI with their baseline workflows and dashboards.
+- **In-progress work**: Finance settlement exports still rely on mocked data until the financial modelling backend exposes the `/api/finance/settlements` endpoints. Follow the tracking issue `FIN-128` for updates.
+- **Next iterations**: tighten alerting hooks for moderation SLA breaches and extend security incident automation with playbook-level notifications.
 
 ## Architecture & Modules
 
@@ -27,7 +34,7 @@ Each module renders inside `AdminLayout` (see `src/app.tsx`) and consumes the de
 - **Moderation Cockpit**: Unified queue for reports, automated rule management, appeals handling and CSV audit exports.
 - **Security Centre**: GDPR requests lifecycle, incident playbooks and compliance reporting.
 - **Financial Insights**: Revenue trends, cohort retention and cost insights rendered with D3.
-- **Export Functionality**: Export data to CSV, Excel (multi-onglets) ou PDF pour l'analyse et l'audit.
+- **Export Functionality**: Export data to CSV, Excel (multi-onglets) ou PDF pour l'analyse et l'audit, avec métadonnées injectées et traçabilité (`exportAuditLogger`).
 - **Real-time Streams**: WebSocket updates enrich analytics widgets for events and users without refreshing the page.
 
 ## Tech Stack
@@ -53,9 +60,13 @@ Each module renders inside `AdminLayout` (see `src/app.tsx`) and consumes the de
    ```
    VITE_API_BASE_URL=http://localhost:5000
    VITE_WS_BASE_URL=ws://localhost:5001/ws
+   # Optional compliance hooks
+   VITE_AUDIT_EXPORT_TOKEN=dev-audit-token
    ```
 
-   `VITE_WS_BASE_URL` is used by `useWebSocket` to subscribe to analytics topics (`events.analytics`, `users.analytics`).
+   - `VITE_API_BASE_URL` points to the REST API gateway that fronts the domain services listed below.
+   - `VITE_WS_BASE_URL` is used by `useWebSocket` to subscribe to analytics topics (`events.analytics`, `users.analytics`).
+   - `VITE_AUDIT_EXPORT_TOKEN` is optional and only required if your backend enforces an audit token for export tracking. The value is surfaced to Axios interceptors so that custom middleware can enrich requests.
 
 3. **Backend services** – start the API gateway and domain services consumed by the portal:
 
@@ -106,6 +117,46 @@ Les exports sont centralisés dans `src/utils/export.ts`. Trois fonctions sont d
 - `exportPdf({ filename, title, data, columns, metadata })`
 
 Toutes appliquent automatiquement les métadonnées aux journaux (`exportAuditLogger`) afin de tracer les téléchargements. Les colonnes définissent l'ordre et les intitulés des colonnes exportées, tandis que `metadata` permet d'ajouter des informations de contexte (filtres actifs, compteurs, horodatage). Les exports Excel acceptent plusieurs feuilles pour combiner KPI et détails, comme démontré dans `UserManagement`.
+
+### Export multi-format
+
+1. Compose the dataset and metadata in the calling component (e.g. active filters, total rows).
+2. Call the appropriate helper:
+   - `exportCsv` pour des extractions légères.
+   - `exportExcel` afin de générer plusieurs onglets (KPI + données détaillées) avec une feuille « Metadata » optionnelle.
+   - `exportPdf` pour les rapports prêts à partager.
+3. Abonnez un collecteur d'audit si nécessaire, par exemple :
+
+   ```ts
+   exportAuditLogger.subscribe(entry => {
+     const token = import.meta.env.VITE_AUDIT_EXPORT_TOKEN
+     if (!token) return
+
+     fetch(`${import.meta.env.VITE_API_BASE_URL}/api/security/export-audit`, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'X-Audit-Token': token
+       },
+       body: JSON.stringify(entry)
+     })
+   })
+   ```
+
+Les exports JSON de secours (audits et incidents) sont réalisés via les services dédiés (`ModerationService`, `SecurityService`) qui renvoient un `Blob` déjà authentifié côté API.
+
+## Configuration temps réel
+
+- Définissez `VITE_WS_BASE_URL` avec le protocole (`ws://` ou `wss://`), l'hôte et le chemin de base exposé par votre passerelle temps réel, par exemple `ws://localhost:5001/ws`.
+- Les clients `useWebSocket` ajoutent automatiquement les suffixes `/users` et `/events` pour se connecter aux flux suivants :
+  - `ws://…/ws/users` pour l'activité utilisateurs.
+  - `ws://…/ws/events` pour l'analytics événements.
+- **Permissions requises** :
+  - `users:read` est nécessaire pour que les messages issus de `/ws/users` soient diffusés.
+  - `events:read` ou `events:manage` débloquent `/ws/events`.
+  - Les modules Modération, Sécurité et Finances ne consomment pas encore de flux temps réel ; leurs hooks RBAC restent gérés par `AuthProvider` côté REST.
+
+Pour déployer en production, préférez `wss://` derrière un reverse proxy mutualisé avec le gateway HTTP et assurez-vous que les souscriptions WebSocket appliquent la même politique RBAC que les endpoints REST (`admin:access` + scope du module).
 
 ## API Integration
 
