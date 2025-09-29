@@ -202,7 +202,12 @@ export const FinancialDashboard: React.FC = () => {
       try {
         const blob = await FinancialService.exportFinancialData(format, filters)
         const url = URL.createObjectURL(blob)
-        const extension = format === 'excel' ? 'xls' : format
+        const extensionByFormat: Record<ExportFormat, string> = {
+          csv: 'csv',
+          excel: 'xlsx',
+          pdf: 'pdf'
+        }
+        const extension = extensionByFormat[format] ?? format
         const link = document.createElement('a')
         link.href = url
         link.download = `financial-report.${extension}`
