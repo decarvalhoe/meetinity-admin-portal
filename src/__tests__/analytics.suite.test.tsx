@@ -12,19 +12,12 @@ import type {
   EventEngagementCell,
   EventAnalyticsSummary
 } from '../services/eventService'
+import { createMockWebSocket } from './utils/networkMocks'
 
-const subscribers = new Set<(event: MessageEvent) => void>()
-let emitWebSocketMessage: (payload: unknown) => void
-let hasActiveSubscribers = false
-
-emitWebSocketMessage = payload => {
-  const message = typeof payload === 'string' ? payload : JSON.stringify(payload)
-  subscribers.forEach(handler =>
-    handler({
-      data: message
-    } as MessageEvent)
-  )
-}
+const {
+  module: webSocketModule,
+  controller: webSocket
+} = createMockWebSocket()
 
 var fixtures: {
   summary: EventAnalyticsSummary
@@ -98,24 +91,7 @@ vi.mock('../services/eventService', () => {
   }
 })
 
-vi.mock('../hooks/useWebSocket', () => {
-  return {
-    useWebSocket: () => ({
-      readyState: 1,
-      connectionAttempts: 0,
-      subscribe: (handler: (event: MessageEvent) => void) => {
-        subscribers.add(handler)
-        hasActiveSubscribers = subscribers.size > 0
-        return () => {
-          subscribers.delete(handler)
-          hasActiveSubscribers = subscribers.size > 0
-        }
-      },
-      send: vi.fn(),
-      close: vi.fn()
-    })
-  }
-})
+vi.mock('../hooks/useWebSocket', () => webSocketModule)
 
 describe('Event analytics pipeline', () => {
   beforeEach(() => {
@@ -125,8 +101,7 @@ describe('Event analytics pipeline', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
-    subscribers.clear()
-    hasActiveSubscribers = false
+    webSocket.reset()
     vi.unstubAllEnvs()
   })
 
@@ -137,10 +112,10 @@ describe('Event analytics pipeline', () => {
       expect(screen.getByTestId('analytics-total-events').textContent).toContain('42')
     )
 
-    await waitFor(() => expect(hasActiveSubscribers).toBe(true))
+    await waitFor(() => expect(webSocket.subscriberCount()).toBeGreaterThan(0))
 
     await act(async () => {
-      emitWebSocketMessage({ type: 'summary', data: { totalEvents: 43 } })
+      webSocket.emit({ type: 'summary', data: { totalEvents: 43 } })
     })
 
     await waitFor(() =>
@@ -148,7 +123,7 @@ describe('Event analytics pipeline', () => {
     )
 
     await act(async () => {
-      emitWebSocketMessage({ type: 'conversion', stage: 'Visiteurs', value: 520 })
+      webSocket.emit({ type: 'conversion', stage: 'Visiteurs', value: 520 })
     })
 
     await waitFor(() =>

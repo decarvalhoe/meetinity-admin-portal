@@ -12,9 +12,12 @@ import type {
   CohortRetention,
   GeoDistributionBucket
 } from '../services/userService'
+import { createMockWebSocket } from './utils/networkMocks'
 
-const subscribers = new Set<(event: MessageEvent) => void>()
-let emitWebSocketMessage: (payload: unknown) => void
+const {
+  module: analyticsWebSocketModule,
+  controller: analyticsWebSocket
+} = createMockWebSocket()
 
 const fixtures = vi.hoisted(() => ({
   engagementFixture: {
@@ -77,11 +80,6 @@ const lastElementByTestId = (testId: string) => {
   return elements[elements.length - 1]
 }
 
-emitWebSocketMessage = payload => {
-  const message = typeof payload === 'string' ? payload : JSON.stringify(payload)
-  subscribers.forEach(handler => handler({ data: message } as MessageEvent))
-}
-
 vi.mock('../services/userService', () => ({
   UserService: {
     getEngagementMetrics: vi.fn().mockResolvedValue(fixtures.engagementFixture),
@@ -92,20 +90,7 @@ vi.mock('../services/userService', () => ({
   }
 }))
 
-vi.mock('../hooks/useWebSocket', () => ({
-  useWebSocket: () => ({
-    readyState: 1,
-    connectionAttempts: 0,
-    subscribe: (handler: (event: MessageEvent) => void) => {
-      subscribers.add(handler)
-      return () => {
-        subscribers.delete(handler)
-      }
-    },
-    send: vi.fn(),
-    close: vi.fn()
-  })
-}))
+vi.mock('../hooks/useWebSocket', () => analyticsWebSocketModule)
 
 describe('User analytics dashboard', () => {
   beforeEach(() => {
@@ -116,7 +101,7 @@ describe('User analytics dashboard', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.clearAllMocks()
-    subscribers.clear()
+    analyticsWebSocket.reset()
   })
 
   it('renders all analytics widgets with fetched data', async () => {
@@ -148,13 +133,13 @@ describe('User analytics dashboard', () => {
     await waitFor(() => expect(digitsForTestId('engagement-dau')).toContain('1200'))
 
     await act(async () => {
-      emitWebSocketMessage({ type: 'engagement', summary: { dailyActiveUsers: 1500 } })
+      analyticsWebSocket.emit({ type: 'engagement', summary: { dailyActiveUsers: 1500 } })
     })
 
     await waitFor(() => expect(digitsForTestId('engagement-dau')).toContain('1500'))
 
     await act(async () => {
-      emitWebSocketMessage({ type: 'heatmap', day: 'Lundi', hour: 9, value: 99 })
+      analyticsWebSocket.emit({ type: 'heatmap', day: 'Lundi', hour: 9, value: 99 })
     })
 
     await waitFor(() => {
