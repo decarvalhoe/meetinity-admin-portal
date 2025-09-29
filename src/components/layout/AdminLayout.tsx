@@ -65,6 +65,7 @@ const breadcrumbNavStyle: React.CSSProperties = {
 export function AdminLayout() {
   const location = useLocation()
   const { admin, hasPermissions } = usePermissions()
+  const canManageMonitoring = useMemo(() => hasPermissions(['monitoring:manage']), [hasPermissions])
 
   const availableModules = useMemo(
     () => ADMIN_MODULES.filter(module => hasPermissions(module.requiredPermissions)),
@@ -90,6 +91,8 @@ export function AdminLayout() {
       return { path: currentPath, label }
     })
   }, [labelMap, location.pathname])
+
+  const outletContext = useMemo(() => ({ canManageMonitoring }), [canManageMonitoring])
 
   return (
     <div style={layoutStyle}>
@@ -130,8 +133,11 @@ export function AdminLayout() {
             <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{admin?.email}</div>
           </div>
         </header>
-        <main style={contentStyle}>
-          <Outlet />
+        <main
+          style={contentStyle}
+          data-can-manage-monitoring={canManageMonitoring ? 'true' : 'false'}
+        >
+          <Outlet context={outletContext} />
         </main>
       </div>
     </div>

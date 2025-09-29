@@ -14,6 +14,8 @@ import type {
 import { SystemMonitoringDashboard } from '../components/monitoring/SystemMonitoringDashboard'
 import { createMockWebSocket } from './utils/networkMocks'
 import { MonitoringService } from '../services/monitoringService'
+import { AuthProvider } from '../hooks/usePermissions'
+import { AuthService } from '../services/authService'
 
 const monitoringWebSocketRef = vi.hoisted(() => ({
   current: null as ReturnType<typeof createMockWebSocket>['controller'] | null
@@ -53,7 +55,21 @@ vi.mock('../hooks/useWebSocket', async () => {
   return module
 })
 
+vi.mock('../services/authService', async () => {
+  const actual = await vi.importActual<typeof import('../services/authService')>(
+    '../services/authService'
+  )
+  return {
+    ...actual,
+    AuthService: {
+      getSession: vi.fn(),
+      getPermissions: vi.fn()
+    }
+  }
+})
+
 const monitoringServiceMock = vi.mocked(MonitoringService)
+const authServiceMock = vi.mocked(AuthService)
 
 function getMonitoringSocket() {
   if (!monitoringWebSocketRef.current) {
@@ -174,6 +190,17 @@ describe('Monitoring dashboard', () => {
     monitoringServiceMock.getStreams.mockImplementation(() =>
       Promise.resolve(clone(fixtures.streams))
     )
+
+    authServiceMock.getSession.mockResolvedValue({
+      id: 'admin-1',
+      email: 'ops@meetinity.test',
+      name: 'Ops Admin',
+      role: 'super-admin'
+    })
+    authServiceMock.getPermissions.mockResolvedValue({
+      permissions: ['admin:access', 'monitoring:read', 'monitoring:manage'],
+      roles: ['operations']
+    })
   })
 
   afterEach(() => {
@@ -183,7 +210,11 @@ describe('Monitoring dashboard', () => {
   })
 
   it('affiche les métriques initiales et les statuts de santé', async () => {
-    render(<SystemMonitoringDashboard />)
+    render(
+      <AuthProvider>
+        <SystemMonitoringDashboard />
+      </AuthProvider>
+    )
 
     await waitFor(() => expect(monitoringServiceMock.getMetrics).toHaveBeenCalledTimes(1))
 
@@ -195,7 +226,11 @@ describe('Monitoring dashboard', () => {
   })
 
   it('met à jour les indicateurs via le flux temps réel', async () => {
-    render(<SystemMonitoringDashboard />)
+    render(
+      <AuthProvider>
+        <SystemMonitoringDashboard />
+      </AuthProvider>
+    )
 
     await waitFor(() => expect(getMonitoringSocket().subscriberCount()).toBeGreaterThan(0))
 
@@ -217,7 +252,11 @@ describe('Monitoring dashboard', () => {
   })
 
   it('rafraîchit l\'historique lors du changement de période', async () => {
-    render(<SystemMonitoringDashboard />)
+    render(
+      <AuthProvider>
+        <SystemMonitoringDashboard />
+      </AuthProvider>
+    )
 
     await waitFor(() => expect(monitoringServiceMock.getHistory).toHaveBeenCalledWith({ range: '24h' }))
 
