@@ -16,9 +16,18 @@ import {
   MonitoringService
 } from '../../services/monitoringService'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { usePermissions } from '../../hooks/usePermissions'
 import { ServiceHealthCard } from './ServiceHealthCard'
 import { MetricsTimeline } from './MetricsTimeline'
 import { StatusLegend } from './StatusLegend'
+import {
+  AlertingService,
+  type AlertRule,
+  type AlertRuleInput,
+  type EscalationPolicy,
+  type NotificationChannel
+} from '../../services/alertingService'
+import { AlertRuleBuilder, type AlertMetricOption } from './AlertRuleBuilder'
 
 interface CombinedServiceEntry {
   service: MonitoredService
@@ -57,6 +66,8 @@ type MonitoringRealtimePayload =
   | StatusRealtimeMessage
   | IncidentRealtimeMessage
   | Record<string, unknown>
+
+type MonitoringDashboardTab = 'overview' | 'alerts'
 
 const DEFAULT_STREAM_PATH = '/ws/monitoring'
 
@@ -104,6 +115,8 @@ function upsertIndicator(
 }
 
 export function SystemMonitoringDashboard() {
+  const { hasPermissions } = usePermissions()
+  const [activeTab, setActiveTab] = useState<MonitoringDashboardTab>('overview')
   const [snapshot, setSnapshot] = useState<MonitoringMetricsResponse | null>(null)
   const [statusSnapshot, setStatusSnapshot] = useState<MonitoringStatusResponse | null>(null)
   const [historyRange, setHistoryRange] = useState<MonitoringHistoryRange>('24h')
@@ -113,6 +126,36 @@ export function SystemMonitoringDashboard() {
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false)
   const [isHistoryLoading, setIsHistoryLoading] = useState(false)
+  const [alertRules, setAlertRules] = useState<AlertRule[]>([])
+  const [notificationChannels, setNotificationChannels] = useState<NotificationChannel[]>([])
+  const [escalationPolicies, setEscalationPolicies] = useState<EscalationPolicy[]>([])
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
+  const [alertsLoaded, setAlertsLoaded] = useState(false)
+  const [isAlertsLoading, setIsAlertsLoading] = useState(false)
+  const [alertsError, setAlertsError] = useState<string | null>(null)
+  const [isSavingRule, setIsSavingRule] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const canManageAlerts = useMemo(() => hasPermissions(['monitoring:manage']), [hasPermissions])
+  const selectedRule = useMemo(
+    () => (selectedRuleId ? alertRules.find(rule => rule.id === selectedRuleId) ?? null : null),
+    [alertRules, selectedRuleId]
+  )
+  const availableMetrics = useMemo<AlertMetricOption[]>(() => {
+    const map = new Map<string, AlertMetricOption>()
+    snapshot?.services.forEach(service => {
+      service.indicators?.forEach(indicator => {
+        if (!map.has(indicator.type)) {
+          map.set(indicator.type, {
+            id: indicator.type,
+            label: `${indicator.label} (${indicator.unit ?? MONITORING_INDICATOR_UNITS[indicator.type] ?? ''})`,
+            unit: indicator.unit ?? MONITORING_INDICATOR_UNITS[indicator.type]
+          })
+        }
+      })
+    })
+    return Array.from(map.values())
+  }, [snapshot])
 
   const loadSnapshot = useCallback(async () => {
     setIsSnapshotLoading(true)
@@ -149,6 +192,39 @@ export function SystemMonitoringDashboard() {
     []
   )
 
+  const loadAlertingResources = useCallback(async () => {
+    setIsAlertsLoading(true)
+    setAlertsError(null)
+    try {
+      const [rules, channels, policies] = await Promise.all([
+        AlertingService.listRules(),
+        AlertingService.listChannels(),
+        AlertingService.listEscalationPolicies()
+      ])
+      setAlertRules(rules)
+      setNotificationChannels(channels)
+      setEscalationPolicies(policies)
+      setAlertsLoaded(true)
+      setSaveError(null)
+      setSaveMessage(null)
+      if (rules.length > 0) {
+        setSelectedRuleId(previous => {
+          if (previous && rules.some(rule => rule.id === previous)) {
+            return previous
+          }
+          return rules[0].id
+        })
+      } else {
+        setSelectedRuleId(null)
+      }
+    } catch (error) {
+      console.error('Failed to load alerting resources', error)
+      setAlertsError("Impossible de récupérer les règles d'alerte. Réessayez plus tard.")
+    } finally {
+      setIsAlertsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     let isMounted = true
     MonitoringService.getStreams()
@@ -175,6 +251,12 @@ export function SystemMonitoringDashboard() {
   useEffect(() => {
     loadHistory(historyRange)
   }, [historyRange, loadHistory])
+
+  useEffect(() => {
+    if (activeTab === 'alerts' && !alertsLoaded && !isAlertsLoading) {
+      loadAlertingResources()
+    }
+  }, [activeTab, alertsLoaded, isAlertsLoading, loadAlertingResources])
 
   const socketUrl = useMemo(() => buildSocketUrl(streamConfig), [streamConfig])
 
@@ -352,6 +434,72 @@ export function SystemMonitoringDashboard() {
     return subscribeToStream(handleRealtimeMessage)
   }, [socketUrl, subscribeToStream, handleRealtimeMessage])
 
+  const handleSelectRule = (ruleId: string) => {
+    setSelectedRuleId(ruleId)
+    setSaveError(null)
+    setSaveMessage(null)
+  }
+
+  const handleCreateNewRule = () => {
+    setSelectedRuleId(null)
+    setSaveError(null)
+    setSaveMessage(null)
+  }
+
+  const handleSaveRule = useCallback(
+    async (input: AlertRuleInput) => {
+      if (!canManageAlerts) {
+        const message = "Vous n'avez pas la permission de gérer les alertes."
+        setSaveError(message)
+        setSaveMessage(null)
+        throw new Error(message)
+      }
+
+      setIsSavingRule(true)
+      setSaveError(null)
+      setSaveMessage(null)
+
+      try {
+        if (selectedRuleId) {
+          const updatedRule = await AlertingService.updateRule(selectedRuleId, input)
+          setAlertRules(prev =>
+            prev.map(rule => (rule.id === updatedRule.id ? updatedRule : rule))
+          )
+          setSelectedRuleId(updatedRule.id)
+          setSaveMessage(`Règle « ${updatedRule.name} » mise à jour.`)
+        } else {
+          const createdRule = await AlertingService.createRule(input)
+          setAlertRules(prev => [createdRule, ...prev])
+          setSelectedRuleId(createdRule.id)
+          setSaveMessage(`Règle « ${createdRule.name} » créée.`)
+        }
+      } catch (error) {
+        console.error('Failed to save alert rule', error)
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Impossible d'enregistrer la règle d'alerte."
+        setSaveError(message)
+        setSaveMessage(null)
+        throw new Error(message)
+      } finally {
+        setIsSavingRule(false)
+      }
+    },
+    [selectedRuleId, canManageAlerts]
+  )
+
+  const tabButtonStyle = (isActive: boolean): React.CSSProperties => ({
+    padding: '10px 16px',
+    borderRadius: '999px',
+    border: '1px solid',
+    borderColor: isActive ? '#2563eb' : '#cbd5f5',
+    backgroundColor: isActive ? '#2563eb' : '#fff',
+    color: isActive ? '#fff' : '#1f2937',
+    fontWeight: 600,
+    cursor: 'pointer'
+  })
+
   const combinedServices = useMemo<CombinedServiceEntry[]>(() => {
     const entries = new Map<string, CombinedServiceEntry>()
 
@@ -452,72 +600,213 @@ export function SystemMonitoringDashboard() {
             {isRealtimeConnected ? 'Flux temps réel actif' : 'Flux temps réel indisponible'}
           </div>
         </div>
-        <StatusLegend />
       </header>
 
-      {snapshotError && (
-        <div
-          role="alert"
-          style={{
-            background: 'rgba(248, 113, 113, 0.1)',
-            color: '#991b1b',
-            padding: '12px 16px',
-            borderRadius: '12px'
-          }}
+      <nav
+        role="tablist"
+        aria-label="Sections de surveillance"
+        style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'overview'}
+          onClick={() => setActiveTab('overview')}
+          style={tabButtonStyle(activeTab === 'overview')}
         >
-          {snapshotError}
-        </div>
+          Santé & métriques
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'alerts'}
+          onClick={() => {
+            setActiveTab('alerts')
+          }}
+          style={tabButtonStyle(activeTab === 'alerts')}
+        >
+          Alertes
+        </button>
+      </nav>
+
+      {activeTab === 'overview' && (
+        <>
+          <StatusLegend />
+          {snapshotError && (
+            <div
+              role="alert"
+              style={{
+                background: 'rgba(248, 113, 113, 0.1)',
+                color: '#991b1b',
+                padding: '12px 16px',
+                borderRadius: '12px'
+              }}
+            >
+              {snapshotError}
+            </div>
+          )}
+
+          <section style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Santé des services</h2>
+              <span style={{ fontSize: '0.875rem', color: '#475569' }}>
+                Dernière mise à jour :{' '}
+                {snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleString() : '—'}
+              </span>
+            </div>
+            {isSnapshotLoading ? (
+              <p style={{ margin: '16px 0', color: '#64748b' }}>Chargement des indicateurs...</p>
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: '20px'
+                }}
+              >
+                {combinedServices.map(entry => (
+                  <ServiceHealthCard
+                    key={entry.service.id}
+                    service={entry.service}
+                    status={entry.status}
+                    incidents={entry.incidents}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {historyError && (
+            <div
+              role="alert"
+              style={{
+                background: 'rgba(248, 113, 113, 0.1)',
+                color: '#991b1b',
+                padding: '12px 16px',
+                borderRadius: '12px'
+              }}
+            >
+              {historyError}
+            </div>
+          )}
+
+          <MetricsTimeline
+            range={historyRange}
+            series={history?.series ?? []}
+            isLoading={isHistoryLoading}
+            onRangeChange={setHistoryRange}
+          />
+        </>
       )}
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Santé des services</h2>
-          <span style={{ fontSize: '0.875rem', color: '#475569' }}>
-            Dernière mise à jour : {snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleString() : '—'}
-          </span>
-        </div>
-        {isSnapshotLoading ? (
-          <p style={{ margin: '16px 0', color: '#64748b' }}>Chargement des indicateurs...</p>
-        ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '20px'
-            }}
-          >
-            {combinedServices.map(entry => (
-              <ServiceHealthCard
-                key={entry.service.id}
-                service={entry.service}
-                status={entry.status}
-                incidents={entry.incidents}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {historyError && (
-        <div
-          role="alert"
-          style={{
-            background: 'rgba(248, 113, 113, 0.1)',
-            color: '#991b1b',
-            padding: '12px 16px',
-            borderRadius: '12px'
-          }}
-        >
-          {historyError}
-        </div>
+      {activeTab === 'alerts' && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {alertsError && (
+            <div
+              role="alert"
+              style={{
+                background: 'rgba(248, 113, 113, 0.1)',
+                color: '#991b1b',
+                padding: '12px 16px',
+                borderRadius: '12px'
+              }}
+            >
+              {alertsError}
+            </div>
+          )}
+          {isAlertsLoading ? (
+            <p style={{ margin: '16px 0', color: '#64748b' }}>Chargement des règles d'alerte...</p>
+          ) : (
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+              <aside
+                style={{
+                  flex: '0 0 320px',
+                  maxWidth: '320px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Règles configurées</h3>
+                  <button
+                    type="button"
+                    onClick={handleCreateNewRule}
+                    disabled={!canManageAlerts}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #2563eb',
+                      backgroundColor: canManageAlerts ? '#2563eb' : '#cbd5f5',
+                      color: '#fff',
+                      cursor: canManageAlerts ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    Nouvelle règle
+                  </button>
+                </div>
+                {alertRules.length === 0 ? (
+                  <p style={{ margin: '12px 0', color: '#64748b' }}>
+                    Aucune règle d'alerte configurée pour le moment.
+                  </p>
+                ) : (
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {alertRules.map(ruleItem => {
+                      const isSelected = selectedRuleId === ruleItem.id
+                      return (
+                        <li key={ruleItem.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectRule(ruleItem.id)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '12px 14px',
+                              borderRadius: '10px',
+                              border: '1px solid',
+                              borderColor: isSelected ? '#2563eb' : '#e2e8f0',
+                              backgroundColor: isSelected ? 'rgba(37, 99, 235, 0.08)' : '#fff',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{ruleItem.name}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                              {ruleItem.severity === 'critical' ? 'Critique' : 'Avertissement'} ·{' '}
+                              {ruleItem.conditions[0]?.metric ?? '—'}
+                            </div>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </aside>
+              <div style={{ flex: '1 1 420px', minWidth: '320px' }}>
+                <AlertRuleBuilder
+                  key={selectedRuleId ?? 'new-rule'}
+                  rule={selectedRule}
+                  metrics={availableMetrics}
+                  channels={notificationChannels}
+                  escalationPolicies={escalationPolicies}
+                  onSave={handleSaveRule}
+                  canManage={canManageAlerts}
+                  isSaving={isSavingRule}
+                  error={saveError}
+                  successMessage={saveMessage}
+                />
+                {!canManageAlerts && (
+                  <p style={{ marginTop: '12px', color: '#991b1b' }}>
+                    Vous avez besoin de la permission « monitoring:manage » pour modifier les règles d'alerte.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
       )}
-
-      <MetricsTimeline
-        range={historyRange}
-        series={history?.series ?? []}
-        isLoading={isHistoryLoading}
-        onRangeChange={setHistoryRange}
-      />
     </div>
   )
 }

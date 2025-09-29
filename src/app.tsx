@@ -36,7 +36,12 @@ function RequirePermissions({ children, requiredPermissions = [] }: RequirePermi
   }
 
   if (!hasPermissions(requiredPermissions)) {
-    return <Navigate to="/unauthorized" replace />
+    const missingPermissions = requiredPermissions.filter(permission => !hasPermissions([permission]))
+    const requiresMonitoringManage = missingPermissions.includes('monitoring:manage')
+    const message = requiresMonitoringManage
+      ? "Vous avez besoin de la permission « monitoring:manage » pour gérer les alertes et les politiques d'escalade."
+      : undefined
+    return <Navigate to="/unauthorized" replace state={message ? { message } : undefined} />
   }
 
   return children
