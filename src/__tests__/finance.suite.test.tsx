@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import React from 'react'
 import { createMockAxios, type AxiosMockController } from './utils/networkMocks'
 
 import type {
@@ -22,7 +24,73 @@ vi.mock('axios', () => {
   return module
 })
 
+vi.mock('d3', () => {
+  const createSelection = () => {
+    const selection: any = {}
+    selection.attr = () => selection
+    selection.selectAll = () => selection
+    selection.remove = () => selection
+    selection.append = () => selection
+    selection.datum = () => selection
+    selection.call = () => selection
+    selection.text = () => selection
+    selection.data = () => ({
+      enter: () => selection
+    })
+    selection.enter = () => selection
+    selection.range = () => selection
+    selection.domain = () => selection
+    selection.padding = () => selection
+    selection.nice = () => selection
+    selection.curve = () => selection
+    selection.y0 = () => selection
+    selection.y1 = () => selection
+    selection.x = () => selection
+    selection.y = () => selection
+    return selection
+  }
+
+  const createScale = () => {
+    const scale: any = () => 0
+    scale.domain = () => scale
+    scale.range = () => scale
+    scale.padding = () => scale
+    scale.nice = () => scale
+    return scale
+  }
+
+  const createLine = () => {
+    const line: any = () => ''
+    line.x = () => line
+    line.y = () => line
+    line.curve = () => line
+    return line
+  }
+
+  const createArea = () => {
+    const area: any = () => ''
+    area.x = () => area
+    area.y0 = () => area
+    area.y1 = () => area
+    area.curve = () => area
+    return area
+  }
+
+  return {
+    select: () => createSelection(),
+    scalePoint: () => createScale(),
+    scaleLinear: () => createScale(),
+    line: () => createLine(),
+    area: () => createArea(),
+    max: () => 0,
+    axisBottom: () => () => undefined,
+    axisLeft: () => () => undefined,
+    curveMonotoneX: 'curveMonotoneX'
+  }
+}, { virtual: true })
+
 let FinancialService: typeof import('../services/financialService').FinancialService
+let FinancialDashboard: typeof import('../components/finance/FinancialDashboard').FinancialDashboard
 
 const getAxiosMock = () => {
   const axiosMock = globalThis.__axiosMockController
@@ -294,5 +362,128 @@ describe('FinancialService HTTP integration', () => {
     })
 
     expect(result).toBe(blob)
+  })
+})
+
+describe('FinancialDashboard export interactions', () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:5000')
+
+    const serviceModule = await import('../services/financialService')
+    FinancialService = serviceModule.FinancialService
+
+    vi.spyOn(FinancialService, 'getRevenueTrend').mockResolvedValue([])
+    vi.spyOn(FinancialService, 'getSubscriptionMetrics').mockResolvedValue({
+      metrics: [],
+      planOptions: []
+    })
+    vi.spyOn(FinancialService, 'getCostMetrics').mockResolvedValue({
+      categories: [],
+      comparison: []
+    })
+    vi.spyOn(FinancialService, 'getCohortRetention').mockResolvedValue([])
+    vi.spyOn(FinancialService, 'getBusinessKpis').mockResolvedValue([])
+    vi.spyOn(FinancialService, 'exportFinancialData').mockResolvedValue(
+      new Blob(['dummy-excel'], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })
+    )
+
+    const componentModule = await import('../components/finance/FinancialDashboard')
+    FinancialDashboard = componentModule.FinancialDashboard
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+    vi.unstubAllEnvs()
+  })
+
+  it('uses the .xlsx extension when exporting Excel data and revokes object URLs', async () => {
+    const appendedAnchors: HTMLAnchorElement[] = []
+    const originalAppendChild = document.body.appendChild.bind(document.body)
+    const appendChildSpy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation(((node: Node) => {
+        if (node instanceof HTMLAnchorElement) {
+          appendedAnchors.push(node)
+        }
+        return originalAppendChild(node)
+      }) as typeof document.body.appendChild)
+
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+    const createObjectURLMock = vi.fn(() => 'blob:mock-excel')
+    const revokeObjectURLMock = vi.fn()
+    const anchorClickMock = vi.fn()
+    const originalAnchorClick = HTMLAnchorElement.prototype.click
+
+    Object.defineProperty(HTMLAnchorElement.prototype, 'click', {
+      configurable: true,
+      writable: true,
+      value: anchorClickMock
+    })
+
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: createObjectURLMock
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      writable: true,
+      value: revokeObjectURLMock
+    })
+
+    try {
+      render(<FinancialDashboard />)
+
+      await waitFor(() => expect(FinancialService.getRevenueTrend).toHaveBeenCalled())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Export Excel' }))
+
+      await waitFor(() =>
+        expect(FinancialService.exportFinancialData).toHaveBeenCalledWith(
+          'excel',
+          expect.objectContaining({ granularity: 'month', plan: 'all' })
+        )
+      )
+
+      expect(appendedAnchors).toHaveLength(1)
+      expect(appendedAnchors[0].download).toBe('financial-report.xlsx')
+      expect(createObjectURLMock).toHaveBeenCalled()
+
+      await waitFor(() => expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-excel'))
+      expect(anchorClickMock).toHaveBeenCalled()
+    } finally {
+      appendChildSpy.mockRestore()
+
+      if (originalCreateObjectURL) {
+        Object.defineProperty(URL, 'createObjectURL', {
+          configurable: true,
+          writable: true,
+          value: originalCreateObjectURL
+        })
+      } else {
+        delete (URL as { createObjectURL?: unknown }).createObjectURL
+      }
+
+      if (originalRevokeObjectURL) {
+        Object.defineProperty(URL, 'revokeObjectURL', {
+          configurable: true,
+          writable: true,
+          value: originalRevokeObjectURL
+        })
+      } else {
+        delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL
+      }
+
+      Object.defineProperty(HTMLAnchorElement.prototype, 'click', {
+        configurable: true,
+        writable: true,
+        value: originalAnchorClick
+      })
+    }
   })
 })
