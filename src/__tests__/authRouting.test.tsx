@@ -50,6 +50,28 @@ describe('Auth routing guard', () => {
     await waitFor(() => expect(screen.getByText('Exporter')).toBeInTheDocument())
   })
 
+  it('permet d’accéder au tableau de bord finance avec les permissions adéquates', async () => {
+    window.history.pushState({}, '', '/admin/finance')
+
+    mockedAuthService.getSession.mockResolvedValue({
+      id: '1',
+      email: 'admin@example.com',
+      name: 'Admin Example',
+      role: 'finance-admin'
+    })
+
+    mockedAuthService.getPermissions.mockResolvedValue({
+      permissions: ['admin:access', 'finance:read'],
+      roles: ['finance-admin']
+    })
+
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Tableau de bord financier' })).toBeInTheDocument()
+    )
+  })
+
   it('redirige vers /unauthorized lorsque les permissions sont insuffisantes', async () => {
     window.history.pushState({}, '', '/admin/events')
 

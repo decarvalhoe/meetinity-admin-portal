@@ -8,6 +8,7 @@ import { ADMIN_MODULES } from './utils/adminNavigation'
 import { ModerationDashboard } from './components/moderation/ModerationDashboard'
 import { PlatformSettings } from './components/configuration/PlatformSettings'
 import { SecurityCenter } from './components/security/SecurityCenter'
+import { FinancialDashboard } from './components/finance/FinancialDashboard'
 
 interface RequirePermissionsProps {
   requiredPermissions?: string[]
@@ -67,6 +68,25 @@ function ModulePlaceholder({ title, description }: { title: string; description?
   )
 }
 
+function renderModule(path: string, label: string, description?: string) {
+  switch (path) {
+    case 'users':
+      return <UserManagement />
+    case 'events':
+      return <EventManagement />
+    case 'moderation':
+      return <ModerationDashboard />
+    case 'security':
+      return <SecurityCenter />
+    case 'finance':
+      return <FinancialDashboard />
+    case 'configuration':
+      return <PlatformSettings />
+    default:
+      return <ModulePlaceholder title={label} description={description} />
+  }
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -89,19 +109,7 @@ export default function App() {
                   <RequirePermissions
                     requiredPermissions={['admin:access', ...module.requiredPermissions]}
                   >
-                    {module.path === 'users' ? (
-                      <UserManagement />
-                    ) : module.path === 'events' ? (
-                      <EventManagement />
-                    ) : module.path === 'moderation' ? (
-                      <ModerationDashboard />
-                    ) : module.path === 'security' ? (
-                      <SecurityCenter />
-                    ) : module.path === 'configuration' ? (
-                      <PlatformSettings />
-                    ) : (
-                      <ModulePlaceholder title={module.label} description={module.description} />
-                    )}
+                    {renderModule(module.path, module.label, module.description)}
                   </RequirePermissions>
                 }
               />

@@ -31,21 +31,15 @@ export const ADMIN_MODULES: AdminModuleConfig[] = [
     description: 'Surveillez les logs, demandes GDPR et incidents de sécurité.'
   },
   {
-    path: 'reports',
-    label: 'Rapports',
-    requiredPermissions: ['reports:read'],
-    description: 'Analysez les indicateurs clés de la plateforme.'
+    path: 'finance',
+    label: 'Finances & BI',
+    requiredPermissions: ['finance:read'],
+    description: 'Suivez les performances financières et les indicateurs clés.'
   },
   {
     path: 'configuration',
     label: 'Configuration',
     requiredPermissions: ['platform:config'],
     description: 'Gérez les paramètres et l’orchestration de la plateforme.'
-  },
-  {
-    path: 'settings',
-    label: 'Paramètres',
-    requiredPermissions: ['settings:read'],
-    description: 'Configurez les paramètres globaux et les intégrations.'
   }
 ]
