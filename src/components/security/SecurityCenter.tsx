@@ -343,122 +343,161 @@ export function SecurityCenter() {
     }
   }
 
-  const renderAuditTab = () => (
-    <section aria-labelledby="security-tab-audit">
-      <header className="security-section-header">
-        <div>
-          <h2 id="security-tab-audit">Audit trail overview</h2>
-          <p>Monitor admin activity across the platform with advanced filtering and exports.</p>
-        </div>
-        <div className="security-actions">
-          <button
-            type="button"
-            onClick={() => handleAuditExport('json')}
-            disabled={!canExportAudit}
-            data-testid="audit-export-json"
-          >
-            Export JSON
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAuditExport('csv')}
-            disabled={!canExportAudit}
-            data-testid="audit-export-csv"
-          >
-            Export CSV
-          </button>
-        </div>
-      </header>
+  const renderAuditTab = () => {
+    const totalPages = auditTotal > 0 ? Math.ceil(auditTotal / pageSize) : 1
+    const currentPage = page + 1
+    const isPreviousDisabled = page === 0
+    const isNextDisabled = currentPage >= totalPages || auditTotal === 0
 
-      <div className="security-filters">
-        <input
-          type="search"
-          placeholder="Full-text search (user, action, resource, IP...)"
-          value={auditFilters.search}
-          onChange={event => handleAuditFilterChange({ search: event.target.value })}
-          data-testid="audit-search"
-        />
-        <input
-          type="text"
-          placeholder="Actor"
-          value={auditFilters.actor}
-          onChange={event => handleAuditFilterChange({ actor: event.target.value })}
-          data-testid="audit-filter-actor"
-        />
-        <select
-          value={auditFilters.resource}
-          onChange={event => handleAuditFilterChange({ resource: event.target.value })}
-          data-testid="audit-filter-resource"
-        >
-          {auditResourceOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={auditFilters.severity}
-          onChange={event =>
-            handleAuditFilterChange({ severity: event.target.value as AuditSeverityFilter })
-          }
-          data-testid="audit-filter-severity"
-        >
-          {auditSeverityOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+    const goToPreviousPage = () => {
+      setPage(previousPage => Math.max(0, previousPage - 1))
+    }
 
-      {auditError && (
-        <div role="alert" className="security-error">
-          {auditError}
-        </div>
-      )}
+    const goToNextPage = () => {
+      setPage(previousPage => {
+        const nextPage = previousPage + 1
+        return nextPage >= totalPages ? previousPage : nextPage
+      })
+    }
 
-      <div className="security-table" role="table">
-        <div className="security-table__header" role="row">
-          <div role="columnheader">Timestamp</div>
-          <div role="columnheader">Actor</div>
-          <div role="columnheader">Action</div>
-          <div role="columnheader">Resource</div>
-          <div role="columnheader">Severity</div>
-          <div role="columnheader">IP address</div>
-        </div>
-        {isAuditLoading ? (
-          <div className="security-table__empty" role="row">
-            Loading audit logs...
+    return (
+      <section aria-labelledby="security-tab-audit">
+        <header className="security-section-header">
+          <div>
+            <h2 id="security-tab-audit">Audit trail overview</h2>
+            <p>Monitor admin activity across the platform with advanced filtering and exports.</p>
           </div>
-        ) : auditLogs.length === 0 ? (
-          <div className="security-table__empty" role="row">
-            No audit activity for the selected filters.
-          </div>
-        ) : (
-          auditLogs.map(log => (
-            <div
-              key={log.id}
-              role="row"
-              className="security-table__row"
-              data-testid={`audit-row-${log.id}`}
+          <div className="security-actions">
+            <button
+              type="button"
+              onClick={() => handleAuditExport('json')}
+              disabled={!canExportAudit}
+              data-testid="audit-export-json"
             >
-              <div role="cell">{formatDate(log.timestamp)}</div>
-              <div role="cell">{log.actor}</div>
-              <div role="cell">{log.action}</div>
-              <div role="cell">{log.resourceType || 'N/A'}</div>
-              <div role="cell">{AUDIT_SEVERITY_LABELS[log.severity]}</div>
-              <div role="cell">{log.ipAddress || '—'}</div>
-            </div>
-          ))
+              Export JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAuditExport('csv')}
+              disabled={!canExportAudit}
+              data-testid="audit-export-csv"
+            >
+              Export CSV
+            </button>
+          </div>
+        </header>
+
+        <div className="security-filters">
+          <input
+            type="search"
+            placeholder="Full-text search (user, action, resource, IP...)"
+            value={auditFilters.search}
+            onChange={event => handleAuditFilterChange({ search: event.target.value })}
+            data-testid="audit-search"
+          />
+          <input
+            type="text"
+            placeholder="Actor"
+            value={auditFilters.actor}
+            onChange={event => handleAuditFilterChange({ actor: event.target.value })}
+            data-testid="audit-filter-actor"
+          />
+          <select
+            value={auditFilters.resource}
+            onChange={event => handleAuditFilterChange({ resource: event.target.value })}
+            data-testid="audit-filter-resource"
+          >
+            {auditResourceOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={auditFilters.severity}
+            onChange={event =>
+              handleAuditFilterChange({ severity: event.target.value as AuditSeverityFilter })
+            }
+            data-testid="audit-filter-severity"
+          >
+            {auditSeverityOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {auditError && (
+          <div role="alert" className="security-error">
+            {auditError}
+          </div>
         )}
-      </div>
-      <footer className="security-footer">
-        <span>
-          Showing {auditLogs.length} of {auditTotal} entries
-        </span>
-      </footer>
-    </section>
-  )
+
+        <div className="security-table" role="table">
+          <div className="security-table__header" role="row">
+            <div role="columnheader">Timestamp</div>
+            <div role="columnheader">Actor</div>
+            <div role="columnheader">Action</div>
+            <div role="columnheader">Resource</div>
+            <div role="columnheader">Severity</div>
+            <div role="columnheader">IP address</div>
+          </div>
+          {isAuditLoading ? (
+            <div className="security-table__empty" role="row">
+              Loading audit logs...
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="security-table__empty" role="row">
+              No audit activity for the selected filters.
+            </div>
+          ) : (
+            auditLogs.map(log => (
+              <div
+                key={log.id}
+                role="row"
+                className="security-table__row"
+                data-testid={`audit-row-${log.id}`}
+              >
+                <div role="cell">{formatDate(log.timestamp)}</div>
+                <div role="cell">{log.actor}</div>
+                <div role="cell">{log.action}</div>
+                <div role="cell">{log.resourceType || 'N/A'}</div>
+                <div role="cell">{AUDIT_SEVERITY_LABELS[log.severity]}</div>
+                <div role="cell">{log.ipAddress || '—'}</div>
+              </div>
+            ))
+          )}
+        </div>
+        <footer className="security-footer">
+          <span>
+            Showing {auditLogs.length} of {auditTotal} entries
+          </span>
+          <div className="security-pagination">
+            <button
+              type="button"
+              onClick={goToPreviousPage}
+              disabled={isPreviousDisabled}
+              data-testid="audit-pagination-prev"
+            >
+              Previous
+            </button>
+            <span data-testid="audit-pagination-status">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={goToNextPage}
+              disabled={isNextDisabled}
+              data-testid="audit-pagination-next"
+            >
+              Next
+            </button>
+          </div>
+        </footer>
+      </section>
+    )
+  }
 
   const renderGdprTab = () => (
     <section aria-labelledby="security-tab-gdpr">

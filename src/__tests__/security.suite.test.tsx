@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
 import React, { ComponentType } from 'react'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SecurityService } from '../services/securityService'
 
 const { mockExportCsv } = vi.hoisted(() => ({ mockExportCsv: vi.fn() }))
@@ -81,6 +81,15 @@ describe('Security center module', () => {
     resourceType: 'configuration',
     severity: 'high' as const,
     ipAddress: '192.168.1.10'
+  }
+  const secondAuditLog = {
+    id: 'audit-2',
+    timestamp: now,
+    actor: 'auditor@example.com',
+    action: 'Viewed audit log',
+    resourceType: 'security',
+    severity: 'medium' as const,
+    ipAddress: '10.0.0.2'
   }
   const gdprRequest = {
     id: 'gdpr-1',
@@ -176,6 +185,10 @@ describe('Security center module', () => {
     mockedSecurityService.downloadComplianceReport.mockResolvedValue(new Blob())
   })
 
+  afterEach(() => {
+    cleanup()
+  })
+
   function renderSecurityCenter() {
     const Component = SecurityCenterComponent
     return render(<Component />)
@@ -189,13 +202,67 @@ describe('Security center module', () => {
 
     await waitFor(() => expect(mockedSecurityService.listAuditLogs).toHaveBeenCalled())
 
-    fireEvent.click(await screen.findByTestId('tab-gdpr'))
+    const [gdprTab] = await screen.findAllByTestId('tab-gdpr')
+    fireEvent.click(gdprTab)
 
     const startButton = await screen.findByTestId('gdpr-action-start-gdpr-1')
     expect(startButton).toBeDisabled()
 
     const downloadButton = screen.getByTestId('gdpr-action-download-gdpr-1')
     expect(downloadButton).toBeDisabled()
+  })
+
+  it('allows navigating audit log pages with pagination controls', async () => {
+    mockedSecurityService.listAuditLogs.mockImplementation(async ({ page = 0 }) => {
+      if (page === 0) {
+        return { logs: [auditLog], total: 60 }
+      }
+
+      if (page === 1) {
+        return { logs: [secondAuditLog], total: 60 }
+      }
+
+      return { logs: [], total: 60 }
+    })
+
+    renderSecurityCenter()
+
+    const paginationStatus = await screen.findByTestId('audit-pagination-status')
+    expect(paginationStatus).toHaveTextContent('Page 1 of 3')
+
+    const previousButton = screen.getByTestId('audit-pagination-prev')
+    const nextButton = screen.getByTestId('audit-pagination-next')
+
+    expect(previousButton).toBeDisabled()
+    expect(nextButton).not.toBeDisabled()
+
+    fireEvent.click(nextButton)
+
+    await waitFor(() =>
+      expect(mockedSecurityService.listAuditLogs).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1 })
+      )
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('audit-pagination-status')).toHaveTextContent('Page 2 of 3')
+    )
+    await waitFor(() => expect(screen.getByTestId('audit-row-audit-2')).toBeInTheDocument())
+
+    await waitFor(() => expect(previousButton).not.toBeDisabled())
+
+    fireEvent.click(previousButton)
+
+    await waitFor(() =>
+      expect(mockedSecurityService.listAuditLogs).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 0 })
+      )
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('audit-pagination-status')).toHaveTextContent('Page 1 of 3')
+    )
+    await waitFor(() => expect(previousButton).toBeDisabled())
   })
 
   it('exports audit logs with the active filters applied', async () => {
@@ -230,7 +297,8 @@ describe('Security center module', () => {
 
     await waitFor(() => expect(mockedSecurityService.listAuditLogs).toHaveBeenCalled())
 
-    fireEvent.click(await screen.findByTestId('tab-gdpr'))
+    const [gdprTab] = await screen.findAllByTestId('tab-gdpr')
+    fireEvent.click(gdprTab)
 
     const startButton = await screen.findByTestId('gdpr-action-start-gdpr-1')
     fireEvent.click(startButton)
