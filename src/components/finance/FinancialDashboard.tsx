@@ -40,9 +40,9 @@ export const FinancialDashboard: React.FC = () => {
   const [state, setState] = useState<DashboardState>(defaultState)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [planOptions, setPlanOptions] = useState<PlanFilter[]>(['all'])
 
   const revenueChartRef = useRef<SVGSVGElement | null>(null)
-  const planOptions = useMemo(() => ['all', ...FinancialService.getPlanOptions()], [])
 
   const filters = useMemo(
     () => ({ granularity, plan, priceVariation, startDate, endDate }),
@@ -53,7 +53,7 @@ export const FinancialDashboard: React.FC = () => {
     setLoading(true)
     setError(null)
     try {
-      const [revenueTrend, subscriptionMetrics, costMetrics, cohortData, kpis] = await Promise.all([
+      const [revenueTrend, subscriptionResponse, costMetrics, cohortData, kpis] = await Promise.all([
         FinancialService.getRevenueTrend(filters),
         FinancialService.getSubscriptionMetrics(filters),
         FinancialService.getCostMetrics(filters),
@@ -61,7 +61,26 @@ export const FinancialDashboard: React.FC = () => {
         FinancialService.getBusinessKpis(filters)
       ])
 
-      setState({ revenueTrend, subscriptionMetrics, costMetrics, cohortData, kpis })
+      const normalizedPlans = subscriptionResponse.planOptions.length
+        ? subscriptionResponse.planOptions
+        : subscriptionResponse.metrics.map((metric) => metric.plan)
+      const uniquePlans = Array.from(
+        new Set(normalizedPlans.filter((option) => option && option !== 'all'))
+      )
+
+      setPlanOptions(['all', ...uniquePlans])
+
+      if (filters.plan !== 'all' && !uniquePlans.includes(filters.plan)) {
+        setPlan('all')
+      }
+
+      setState({
+        revenueTrend,
+        subscriptionMetrics: subscriptionResponse.metrics,
+        costMetrics,
+        cohortData,
+        kpis
+      })
     } catch (err) {
       setError(
         err instanceof Error
@@ -307,11 +326,16 @@ export const FinancialDashboard: React.FC = () => {
         <svg ref={revenueChartRef} className="mt-4 w-full" role="img" aria-label="Évolution des revenus" />
       </section>
 
-      <BusinessKpiCards kpis={state.kpis} />
+      <BusinessKpiCards kpis={state.kpis} loading={loading} />
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <SubscriptionManager metrics={state.subscriptionMetrics} cohorts={state.cohortData} granularity={granularity} />
-        <CostInsights data={state.costMetrics} />
+        <SubscriptionManager
+          metrics={state.subscriptionMetrics}
+          cohorts={state.cohortData}
+          granularity={granularity}
+          loading={loading}
+        />
+        <CostInsights data={state.costMetrics} loading={loading} />
       </section>
     </div>
   )

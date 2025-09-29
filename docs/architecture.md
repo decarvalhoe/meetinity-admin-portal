@@ -74,4 +74,4 @@ Les scripts ajoutés dans `package.json` permettent de cibler chaque domaine :
 | `npm run test:finance` | Dashboard financier et visualisations D3. | `src/__tests__/finance.suite.test.tsx` |
 | `npm run test:security` | Centre de sécurité, GDPR et incidents. | `src/__tests__/security.suite.test.tsx` |
 
-Ces suites partagent des mocks mutualisés (`createMockWebSocket`, `createMockAxios`) définis dans `src/__tests__/utils/networkMocks.ts`.
+Ces suites réutilisent les utilitaires réseau (`createMockWebSocket`, `createMockAxios`) définis dans `src/__tests__/utils/networkMocks.ts`.

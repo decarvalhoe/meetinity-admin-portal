@@ -3,6 +3,7 @@ import { BusinessKpi } from '../../services/financialService'
 
 interface BusinessKpiCardsProps {
   kpis: BusinessKpi[]
+  loading: boolean
 }
 
 const formatValue = (kpi: BusinessKpi) => {
@@ -31,7 +32,15 @@ const formatDelta = (kpi: BusinessKpi) => {
   return `${prefix}${kpi.delta.toFixed(2)}${kpi.format === 'percentage' ? '%' : ''}`
 }
 
-export const BusinessKpiCards: React.FC<BusinessKpiCardsProps> = ({ kpis }) => {
+export const BusinessKpiCards: React.FC<BusinessKpiCardsProps> = ({ kpis, loading }) => {
+  if (loading && !kpis.length) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        Chargement des indicateurs financiers…
+      </div>
+    )
+  }
+
   if (!kpis.length) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">

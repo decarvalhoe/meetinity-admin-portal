@@ -6,9 +6,10 @@ interface SubscriptionManagerProps {
   metrics: SubscriptionMetric[]
   cohorts: CohortPoint[]
   granularity: TimeGranularity
+  loading: boolean
 }
 
-export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metrics, cohorts, granularity }) => {
+export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metrics, cohorts, granularity, loading }) => {
   const histogramRef = useRef<SVGSVGElement | null>(null)
   const heatmapRef = useRef<SVGSVGElement | null>(null)
 
@@ -37,6 +38,17 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metric
 
     svg.attr('viewBox', `0 0 ${width} ${height}`)
     svg.selectAll('*').remove()
+
+    if (loading) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#6b7280')
+        .text('Chargement des métriques...')
+      return
+    }
 
     if (metrics.length === 0) {
       svg
@@ -97,7 +109,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metric
       .attr('text-anchor', 'middle')
       .attr('fill', '#4b5563')
       .text('ARPU par plan')
-  }, [metrics])
+  }, [metrics, loading])
 
   useEffect(() => {
     if (!heatmapRef.current) {
@@ -111,6 +123,17 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metric
 
     svg.attr('viewBox', `0 0 ${width} ${height}`)
     svg.selectAll('*').remove()
+
+    if (loading) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#6b7280')
+        .text('Chargement des cohortes...')
+      return
+    }
 
     if (cohorts.length === 0) {
       svg
@@ -165,7 +188,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metric
       .call(d3.axisBottom(xScale))
 
     container.append('g').call(d3.axisLeft(yScale))
-  }, [cohorts])
+  }, [cohorts, loading])
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -177,16 +200,22 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ metric
           </p>
         </div>
         <div className="text-right text-sm text-slate-600">
-          <div>
-            <span className="font-semibold text-slate-900">{totals.active.toLocaleString('fr-FR')}</span> actifs
-          </div>
-          <div>
-            <span className="font-semibold text-emerald-600">+{totals.newSubs.toLocaleString('fr-FR')}</span> nouveaux
-          </div>
-          <div>
-            <span className="font-semibold text-rose-600">-{totals.churn.toLocaleString('fr-FR')}</span> churn
-          </div>
-          <div>ARPU moyen: €{totals.arpu.toLocaleString('fr-FR')}</div>
+          {loading ? (
+            <span className="text-slate-400">Chargement…</span>
+          ) : (
+            <>
+              <div>
+                <span className="font-semibold text-slate-900">{totals.active.toLocaleString('fr-FR')}</span> actifs
+              </div>
+              <div>
+                <span className="font-semibold text-emerald-600">+{totals.newSubs.toLocaleString('fr-FR')}</span> nouveaux
+              </div>
+              <div>
+                <span className="font-semibold text-rose-600">-{totals.churn.toLocaleString('fr-FR')}</span> churn
+              </div>
+              <div>ARPU moyen: €{totals.arpu.toLocaleString('fr-FR')}</div>
+            </>
+          )}
         </div>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
