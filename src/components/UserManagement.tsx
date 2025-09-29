@@ -6,7 +6,7 @@ import { UserActionsBar } from './UserActionsBar'
 import { UserStats } from './UserStats'
 import { useDebounce } from '../hooks/useDebounce'
 import { usePagination } from '../hooks/usePagination'
-import { downloadCsv } from '../utils/csv'
+import { exportExcel, type ExportColumn } from '../utils/export'
 import { UserAnalyticsDashboard } from './users/UserAnalyticsDashboard'
 
 export function UserManagement() {
@@ -101,15 +101,106 @@ export function UserManagement() {
     }
   }
 
+  const userColumns: ExportColumn<User>[] = [
+    { key: 'id', header: 'ID utilisateur' },
+    { key: 'name', header: 'Nom' },
+    { key: 'email', header: 'Email' },
+    { key: 'status', header: 'Statut' },
+    { key: 'industry', header: 'Secteur', formatter: value => value ?? 'N/A' },
+    {
+      key: 'createdAt',
+      header: 'Inscription',
+      formatter: value => (value ? new Date(String(value)).toISOString() : 'Inconnue')
+    }
+  ]
+
   const handleExport = async () => {
-    const blob = await UserService.export({
+    const exportPayload = await UserService.export({
       search: filters.search,
       status: filters.status,
       industry: filters.industry,
       startDate: filters.startDate,
       endDate: filters.endDate
     })
-    downloadCsv(blob, 'users.csv')
+
+    const { users: exportUsers, stats: exportStats, metadata } = exportPayload
+    const exportedAt = new Date()
+    const exportedAtIso = exportedAt.toISOString()
+    const fileDate = exportedAtIso.slice(0, 10)
+
+    const signupsSheet = Object.entries(exportStats.signups || {}).map(([period, total]) => ({
+      period,
+      total
+    }))
+    const statusSheet = Object.entries(exportStats.byStatus || {}).map(([status, total]) => ({
+      status,
+      total
+    }))
+    const industrySheet = Object.entries(exportStats.byIndustry || {}).map(([industry, total]) => ({
+      industry,
+      total
+    }))
+
+    const filtersMetadata = {
+      search: filters.search || undefined,
+      status: filters.status || undefined,
+      industry: filters.industry || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined
+    }
+
+    const sheets = [
+      {
+        name: 'Utilisateurs',
+        data: exportUsers,
+        columns: userColumns
+      },
+      signupsSheet.length
+        ? {
+            name: 'Inscriptions',
+            data: signupsSheet,
+            columns: [
+              { key: 'period', header: 'Période' },
+              { key: 'total', header: 'Total' }
+            ]
+          }
+        : null,
+      statusSheet.length
+        ? {
+            name: 'Par statut',
+            data: statusSheet,
+            columns: [
+              { key: 'status', header: 'Statut' },
+              { key: 'total', header: 'Total' }
+            ]
+          }
+        : null,
+      industrySheet.length
+        ? {
+            name: 'Par secteur',
+            data: industrySheet,
+            columns: [
+              { key: 'industry', header: 'Secteur' },
+              { key: 'total', header: 'Total' }
+            ]
+          }
+        : null
+    ].filter(Boolean) as {
+      name: string
+      data: Record<string, unknown>[]
+      columns: ExportColumn<Record<string, unknown>>[]
+    }[]
+
+    await exportExcel({
+      filename: `users-export-${fileDate}`,
+      sheets,
+      metadata: {
+        ...metadata,
+        filters: filtersMetadata,
+        totalUsers: exportUsers.length,
+        exportedAt: exportedAtIso
+      }
+    })
   }
 
   return (

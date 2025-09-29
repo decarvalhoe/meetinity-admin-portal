@@ -16,10 +16,12 @@
     "chart.js": "^4.5.0",
     "d3": "^7.9.0",
     "date-fns": "^4.1.0",
+    "pdfmake": "^0.2.20",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.8.0"
+    "react-router-dom": "^7.8.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.4.8",

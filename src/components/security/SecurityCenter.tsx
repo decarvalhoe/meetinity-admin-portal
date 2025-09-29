@@ -12,7 +12,7 @@ import {
 } from '../../services/securityService'
 import { usePagination } from '../../hooks/usePagination'
 import { useDebounce } from '../../hooks/useDebounce'
-import { downloadCsv } from '../../utils/csv'
+import { exportCsv, type ExportColumn } from '../../utils/export'
 import { usePermissions } from '../../hooks/usePermissions'
 
 const tabs = [
@@ -64,6 +64,22 @@ function downloadBlob(blob: Blob, filename: string) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+const auditColumns: ExportColumn<AuditLogEntry>[] = [
+  {
+    key: 'timestamp',
+    header: 'Horodatage',
+    formatter: value => new Date(String(value)).toISOString()
+  },
+  { key: 'actor', header: 'Acteur' },
+  { key: 'resourceType', header: 'Ressource' },
+  { key: 'action', header: 'Action' },
+  {
+    key: 'severity',
+    header: 'Sévérité',
+    formatter: value => (value ? AUDIT_SEVERITY_LABELS[value as AuditSeverity] || value : 'N/A')
+  }
+]
 
 function formatDate(timestamp: string) {
   return new Date(timestamp).toLocaleString()
@@ -206,11 +222,27 @@ export function SecurityCenter() {
         severity: auditFilters.severity === 'all' ? undefined : auditFilters.severity
       }
 
-      const blob = await SecurityService.exportAuditLogs(format, exportFilters)
+      const { logs, total } = await SecurityService.listAuditLogs({
+        ...exportFilters,
+        page: 0,
+        pageSize: Math.max(auditTotal, pageSize)
+      })
+
       if (format === 'csv') {
-        downloadCsv(blob, `audit-logs.${format}`)
+        await exportCsv({
+          filename: 'audit-logs',
+          data: logs,
+          columns: auditColumns,
+          metadata: {
+            total,
+            filters: exportFilters
+          }
+        })
       } else {
-        downloadBlob(blob, `audit-logs.${format}`)
+        const blob = new Blob([JSON.stringify({ logs, total }, null, 2)], {
+          type: 'application/json'
+        })
+        downloadBlob(blob, 'audit-logs.json')
       }
     } catch (error) {
       console.error('Failed to export audit logs', error)

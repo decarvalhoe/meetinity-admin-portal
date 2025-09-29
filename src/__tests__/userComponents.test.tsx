@@ -7,17 +7,29 @@ vi.mock('react-chartjs-2', () => ({
   Line: () => null
 }))
 
+const { mockExportExcel } = vi.hoisted(() => ({ mockExportExcel: vi.fn() }))
+
 vi.mock('../services/userService', () => ({
   UserService: {
     list: vi.fn().mockResolvedValue({ users: [], total: 0 }),
     stats: vi.fn().mockResolvedValue({ signups: {}, byIndustry: {}, byStatus: {} }),
-    export: vi.fn().mockResolvedValue(new Blob()),
+    export: vi.fn().mockResolvedValue({
+      users: [],
+      stats: { signups: {}, byIndustry: {}, byStatus: {} },
+      metadata: { generatedAt: new Date().toISOString() }
+    }),
     bulk: vi.fn().mockResolvedValue(undefined)
   }
 }))
 
-vi.mock('../utils/csv', () => ({
-  downloadCsv: vi.fn()
+vi.mock('../utils/export', () => ({
+  exportCsv: vi.fn(),
+  exportExcel: mockExportExcel,
+  exportPdf: vi.fn(),
+  exportAuditLogger: {
+    log: vi.fn(),
+    subscribe: vi.fn(() => () => undefined)
+  }
 }))
 
 expect.extend(matchers)
@@ -148,7 +160,7 @@ it('uses the current search input when exporting users', async () => {
 
   const actions = container.querySelectorAll('.user-actions')
   const targetActions = actions[actions.length - 1] as HTMLElement
-  fireEvent.click(within(targetActions).getByText('Export CSV'))
+  fireEvent.click(within(targetActions).getByText('Exporter'))
 
   await waitFor(() => expect(UserService.export).toHaveBeenCalled())
 
@@ -159,6 +171,8 @@ it('uses the current search input when exporting users', async () => {
     startDate: '',
     endDate: ''
   })
+
+  expect(mockExportExcel).toHaveBeenCalled()
 })
 
 it('corrects the current page when total decreases after deletion', async () => {

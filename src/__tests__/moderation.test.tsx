@@ -43,8 +43,16 @@ vi.mock('../services/moderationService', () => {
   }
 })
 
-vi.mock('../utils/csv', () => ({
-  downloadCsv: vi.fn()
+const { mockExportCsv } = vi.hoisted(() => ({ mockExportCsv: vi.fn() }))
+
+vi.mock('../utils/export', () => ({
+  exportCsv: mockExportCsv,
+  exportExcel: vi.fn(),
+  exportPdf: vi.fn(),
+  exportAuditLogger: {
+    log: vi.fn(),
+    subscribe: vi.fn(() => () => undefined)
+  }
 }))
 
 expect.extend(matchers)
@@ -210,6 +218,13 @@ describe('Moderation dashboard', () => {
 
     const [exportJsonButton] = await screen.findAllByTestId('audit-export-json')
     fireEvent.click(exportJsonButton)
-    await waitFor(() => expect(mockedModerationService.exportAuditTrail).toHaveBeenCalledWith('json', expect.any(Object)))
+    await waitFor(() => expect(mockExportCsv).not.toHaveBeenCalled())
+    await waitFor(() => expect(mockedModerationService.getAuditTrail).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 0 })
+    ))
+
+    const csvButton = await screen.findByTestId('audit-export-csv')
+    fireEvent.click(csvButton)
+    await waitFor(() => expect(mockExportCsv).toHaveBeenCalledTimes(1))
   })
 })
