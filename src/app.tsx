@@ -9,6 +9,7 @@ import { ModerationDashboard } from './components/moderation/ModerationDashboard
 import { PlatformSettings } from './components/configuration/PlatformSettings'
 import { SecurityCenter } from './components/security/SecurityCenter'
 import { FinancialDashboard } from './components/finance/FinancialDashboard'
+import { SystemMonitoringDashboard } from './components/monitoring/SystemMonitoringDashboard'
 
 interface RequirePermissionsProps {
   requiredPermissions?: string[]
@@ -78,6 +79,8 @@ function renderModule(path: string, label: string, description?: string) {
       return <ModerationDashboard />
     case 'security':
       return <SecurityCenter />
+    case 'monitoring':
+      return <SystemMonitoringDashboard />
     case 'finance':
       return <FinancialDashboard />
     case 'configuration':

@@ -31,6 +31,12 @@ export const ADMIN_MODULES: AdminModuleConfig[] = [
     description: 'Surveillez les logs, demandes GDPR et incidents de sécurité.'
   },
   {
+    path: 'monitoring',
+    label: 'Monitoring',
+    requiredPermissions: ['monitoring:read'],
+    description: 'Visualisez la santé des services, les alertes et les métriques temps réel.'
+  },
+  {
     path: 'finance',
     label: 'Finances & BI',
     requiredPermissions: ['finance:read'],
