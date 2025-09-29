@@ -11,7 +11,7 @@ export const AUDIT_SEVERITY_LABELS: Record<AuditSeverity, string> = {
   critical: 'Critique'
 }
 
-export interface AuditLogEntry {
+export interface AuditLogEntry extends Record<string, unknown> {
   id: string
   timestamp: string
   actor: string

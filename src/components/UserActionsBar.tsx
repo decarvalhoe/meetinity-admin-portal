@@ -15,7 +15,7 @@ export function UserActionsBar({ selected, onActivate, onDeactivate, onDelete, o
       <button disabled={disabled} onClick={onActivate}>Activate</button>
       <button disabled={disabled} onClick={onDeactivate}>Deactivate</button>
       <button disabled={disabled} onClick={onDelete}>Delete</button>
-      <button onClick={onExport}>Export CSV</button>
+      <button onClick={onExport}>Exporter</button>
     </div>
   )
 }

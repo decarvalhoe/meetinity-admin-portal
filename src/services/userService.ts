@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-export interface User {
+export interface User extends Record<string, unknown> {
   id: string
   name: string
   email: string
@@ -87,6 +87,12 @@ export interface GeoDistributionBucket {
   longitude?: number
 }
 
+export interface UserExportPayload {
+  users: User[]
+  stats: Stats
+  metadata?: Record<string, unknown>
+}
+
 export const UserService = {
   async list(params: ListParams) {
     const { data } = await axios.get(`${API}/api/users`, { params })
@@ -127,10 +133,9 @@ export const UserService = {
     return data as GeoDistributionBucket[]
   },
   async export(params: ListParams) {
-    const res = await axios.get(`${API}/api/users/export`, {
-      params,
-      responseType: 'blob'
+    const { data } = await axios.get(`${API}/api/users/export`, {
+      params
     })
-    return res.data as Blob
+    return data as UserExportPayload
   }
 }

@@ -3,7 +3,18 @@ import * as matchers from '@testing-library/jest-dom/matchers'
 import React, { ComponentType } from 'react'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SecurityService } from '../services/securityService'
-import { downloadCsv } from '../utils/csv'
+
+const { mockExportCsv } = vi.hoisted(() => ({ mockExportCsv: vi.fn() }))
+
+vi.mock('../utils/export', () => ({
+  exportCsv: mockExportCsv,
+  exportExcel: vi.fn(),
+  exportPdf: vi.fn(),
+  exportAuditLogger: {
+    log: vi.fn(),
+    subscribe: vi.fn(() => () => undefined)
+  }
+}))
 
 const permissionsState = {
   admin: { id: 'admin-1', email: 'admin@example.com', name: 'Security Admin' },
@@ -56,15 +67,10 @@ vi.mock('../services/securityService', () => {
   }
 })
 
-vi.mock('../utils/csv', () => ({
-  downloadCsv: vi.fn()
-}))
-
 expect.extend(matchers)
 
 describe('Security center module', () => {
   const mockedSecurityService = vi.mocked(SecurityService, true)
-  const mockedDownloadCsv = vi.mocked(downloadCsv, true)
 
   const now = new Date().toISOString()
   const auditLog = {
@@ -207,13 +213,16 @@ describe('Security center module', () => {
     fireEvent.click(exportCsvButton)
 
     await waitFor(() =>
-      expect(mockedSecurityService.exportAuditLogs).toHaveBeenCalledWith(
-        'csv',
-        expect.objectContaining({ search: 'configuration' })
+      expect(mockedSecurityService.listAuditLogs).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          page: 0,
+          pageSize: expect.any(Number),
+          search: 'configuration'
+        })
       )
     )
 
-    expect(mockedDownloadCsv).toHaveBeenCalled()
+    expect(mockExportCsv).toHaveBeenCalled()
   })
 
   it('drives GDPR status transitions and confirmations', async () => {

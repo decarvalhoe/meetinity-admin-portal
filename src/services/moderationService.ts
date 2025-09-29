@@ -86,7 +86,7 @@ export interface ModerationRuleInput {
   actions: Record<string, unknown>
 }
 
-export interface AuditTrailEntry {
+export interface AuditTrailEntry extends Record<string, unknown> {
   id: string
   timestamp: string
   actor: string

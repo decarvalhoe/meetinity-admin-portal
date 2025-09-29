@@ -47,7 +47,7 @@ describe('Auth routing guard', () => {
 
     render(<App />)
 
-    await waitFor(() => expect(screen.getByText('Export CSV')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Exporter')).toBeInTheDocument())
   })
 
   it('redirige vers /unauthorized lorsque les permissions sont insuffisantes', async () => {

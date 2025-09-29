@@ -11,7 +11,7 @@ The admin portal is built with **React 18**, **TypeScript**, and **Vite**. It of
 - **User Management**: Complete CRUD operations for user accounts with advanced filtering and search capabilities
 - **Data Visualization**: Interactive charts and statistics using Chart.js and React Chart.js 2
 - **Bulk Operations**: Perform actions on multiple users simultaneously (activate, deactivate, delete)
-- **Export Functionality**: Export user data to CSV format for external analysis
+- **Export Functionality**: Export data to CSV, Excel (multi-onglets) ou PDF pour l'analyse et l'audit
 - **Pagination**: Efficient handling of large datasets with customizable page sizes
 - **Real-time Filtering**: Debounced search and filtering by status, industry, and date ranges
 
@@ -43,6 +43,16 @@ npm run dev
 ```bash
 npm test
 ```
+
+## Export helpers
+
+Les exports sont centralisés dans `src/utils/export.ts`. Trois fonctions sont disponibles :
+
+- `exportCsv({ filename, data, columns, metadata })`
+- `exportExcel({ filename, sheets, metadata })`
+- `exportPdf({ filename, title, data, columns, metadata })`
+
+Toutes appliquent automatiquement les métadonnées aux journaux (`exportAuditLogger`) afin de tracer les téléchargements. Les colonnes définissent l'ordre et les intitulés des colonnes exportées, tandis que `metadata` permet d'ajouter des informations de contexte (filtres actifs, compteurs, horodatage). Les exports Excel acceptent plusieurs feuilles pour combiner KPI et détails, comme démontré dans `UserManagement`.
 
 Set API base url via `.env`:
 

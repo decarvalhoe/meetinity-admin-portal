@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AuditTrailEntry,
+  AuditTrailParams,
   ModerationFilters,
   ModerationService,
   ModerationStatus,
@@ -13,7 +14,7 @@ import { ReportedContentTable } from './ReportedContentTable'
 import { UserModerationPanel } from './UserModerationPanel'
 import { ModerationRulesEditor } from './ModerationRulesEditor'
 import { AppealsQueue } from './AppealsQueue'
-import { downloadCsv } from '../../utils/csv'
+import { exportCsv, type ExportColumn } from '../../utils/export'
 
 const STATUS_LABELS: Record<ModerationStatus | 'all', string> = {
   all: 'Tous les statuts',
@@ -56,6 +57,23 @@ function downloadBlob(blob: Blob, filename: string) {
   link.click()
   URL.revokeObjectURL(url)
 }
+
+const auditColumns: ExportColumn<AuditTrailEntry>[] = [
+  {
+    key: 'timestamp',
+    header: 'Horodatage',
+    formatter: value => new Date(String(value)).toISOString()
+  },
+  { key: 'actor', header: 'Acteur' },
+  { key: 'action', header: 'Action' },
+  { key: 'targetType', header: 'Type de cible' },
+  { key: 'targetId', header: 'ID cible' },
+  {
+    key: 'status',
+    header: 'Statut',
+    formatter: value => (value ? STATUS_LABELS[value as ModerationStatus] || value : 'N/A')
+  }
+]
 
 export function ModerationDashboard() {
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters)
@@ -116,16 +134,34 @@ export function ModerationDashboard() {
 
   const handleAuditExport = async (format: 'json' | 'csv') => {
     try {
-      const blob = await ModerationService.exportAuditTrail(format, {
+      const query: AuditTrailParams = {
         ...normalizedFilters,
-        page,
-        pageSize
-      })
+        page: 0,
+        pageSize: Math.max(auditTotal, pageSize)
+      }
+
+      const { entries, total } = await ModerationService.getAuditTrail(query)
 
       if (format === 'csv') {
-        downloadCsv(blob, `audit-trail.${format}`)
+        await exportCsv({
+          filename: 'audit-trail',
+          data: entries,
+          columns: auditColumns,
+          metadata: {
+            total,
+            filters: {
+              search: normalizedFilters.search || undefined,
+              status: normalizedFilters.status || undefined,
+              severity: normalizedFilters.severity || undefined,
+              contentType: normalizedFilters.contentType || undefined
+            }
+          }
+        })
       } else {
-        downloadBlob(blob, `audit-trail.${format}`)
+        const blob = new Blob([JSON.stringify({ entries, total }, null, 2)], {
+          type: 'application/json'
+        })
+        downloadBlob(blob, 'audit-trail.json')
       }
     } catch (error) {
       console.error('Failed to export audit trail', error)
