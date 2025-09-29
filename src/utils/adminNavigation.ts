@@ -25,6 +25,12 @@ export const ADMIN_MODULES: AdminModuleConfig[] = [
     description: 'Suivez les signalements et prenez des mesures disciplinaires.'
   },
   {
+    path: 'security',
+    label: 'Sécurité',
+    requiredPermissions: ['security:read'],
+    description: 'Surveillez les logs, demandes GDPR et incidents de sécurité.'
+  },
+  {
     path: 'reports',
     label: 'Rapports',
     requiredPermissions: ['reports:read'],
