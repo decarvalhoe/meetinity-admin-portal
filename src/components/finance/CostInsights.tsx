@@ -4,13 +4,18 @@ import { CostMetrics } from '../../services/financialService'
 
 interface CostInsightsProps {
   data: CostMetrics
+  loading: boolean
 }
 
-export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
+export const CostInsights: React.FC<CostInsightsProps> = ({ data, loading }) => {
   const comparisonRef = useRef<SVGSVGElement | null>(null)
   const categoriesRef = useRef<SVGSVGElement | null>(null)
 
   const totals = useMemo(() => {
+    if (loading) {
+      return { totalCost: 0, margin: 0 }
+    }
+
     const totalCost = data.categories.reduce((sum, category) => sum + category.amount, 0)
     const lastComparison = data.comparison[data.comparison.length - 1]
     const margin = lastComparison ? lastComparison.revenue - lastComparison.cost : 0
@@ -18,7 +23,7 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
       totalCost,
       margin
     }
-  }, [data])
+  }, [data, loading])
 
   useEffect(() => {
     if (!comparisonRef.current) {
@@ -32,6 +37,17 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
 
     svg.attr('viewBox', `0 0 ${width} ${height}`)
     svg.selectAll('*').remove()
+
+    if (loading) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#6b7280')
+        .text('Chargement des coûts...')
+      return
+    }
 
     if (data.comparison.length === 0) {
       svg
@@ -121,7 +137,7 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
       .attr('fill', '#374151')
       .attr('font-size', 12)
       .text('Revenus')
-  }, [data.comparison])
+  }, [data.comparison, loading])
 
   useEffect(() => {
     if (!categoriesRef.current) {
@@ -135,6 +151,17 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
 
     svg.attr('viewBox', `0 0 ${width} ${height}`)
     svg.selectAll('*').remove()
+
+    if (loading) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#6b7280')
+        .text('Chargement des catégories...')
+      return
+    }
 
     if (data.categories.length === 0) {
       svg
@@ -194,7 +221,7 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
       .attr('fill', '#4b5563')
       .attr('font-size', 12)
       .text((d) => `€${d.amount.toFixed(0)}`)
-  }, [data.categories])
+  }, [data.categories, loading])
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -206,14 +233,22 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ data }) => {
           </p>
         </div>
         <div className="text-right text-sm text-slate-600">
-          <div>
-            Coûts totaux: <span className="font-semibold text-slate-900">€{totals.totalCost.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</span>
-          </div>
-          <div>
-            Marge dernière période: <span className={totals.margin >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
-              €{totals.margin.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
-            </span>
-          </div>
+          {loading ? (
+            <span className="text-slate-400">Chargement…</span>
+          ) : (
+            <>
+              <div>
+                Coûts totaux:{' '}
+                <span className="font-semibold text-slate-900">€{totals.totalCost.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</span>
+              </div>
+              <div>
+                Marge dernière période:{' '}
+                <span className={totals.margin >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                  €{totals.margin.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
       <div className="grid gap-6">

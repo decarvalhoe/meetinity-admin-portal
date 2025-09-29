@@ -10,7 +10,7 @@ The admin portal is built with **React 18**, **TypeScript**, and **Vite**. It of
 
 - **Overall progress**: ~85% of the functional scope has shipped to production-like environments.
 - **Delivered modules**: Users, Events, Moderation, Security, Configuration and Finance are available in the UI with their baseline workflows and dashboards.
-- **In-progress work**: Finance settlement exports still rely on mocked data until the financial modelling backend exposes the `/api/finance/settlements` endpoints. Follow the tracking issue `FIN-128` for updates.
+- **In-progress work**: Align settlement exports with the financial modelling backend once the `/api/finance/settlements` endpoints ship (tracking issue `FIN-128`).
 - **Next iterations**: tighten alerting hooks for moderation SLA breaches and extend security incident automation with playbook-level notifications.
 
 ## Architecture & Modules
