@@ -64,7 +64,12 @@ const breadcrumbNavStyle: React.CSSProperties = {
 
 export function AdminLayout() {
   const location = useLocation()
-  const { admin } = usePermissions()
+  const { admin, hasPermissions } = usePermissions()
+
+  const availableModules = useMemo(
+    () => ADMIN_MODULES.filter(module => hasPermissions(module.requiredPermissions)),
+    [hasPermissions]
+  )
 
   const labelMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -93,14 +98,16 @@ export function AdminLayout() {
           <span style={{ fontSize: '1.25rem', fontWeight: 700 }}>Meetinity Admin</span>
         </div>
         <nav aria-label="Navigation principale">
-          {ADMIN_MODULES.map(module => (
+          {availableModules.map(module => (
             <NavLink
               key={module.path}
               to={`/admin/${module.path}`}
               style={({ isActive }) => (isActive ? navLinkActiveStyle : navLinkBaseStyle)}
             >
               <div style={{ fontWeight: 600 }}>{module.label}</div>
-              <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{module.description}</div>
+              {module.description && (
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{module.description}</div>
+              )}
             </NavLink>
           ))}
         </nav>
