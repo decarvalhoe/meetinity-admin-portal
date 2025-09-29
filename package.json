@@ -7,6 +7,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
+    "test:events": "vitest run src/__tests__/events.suite.test.tsx",
+    "test:analytics": "vitest run src/__tests__/analytics.suite.test.tsx",
+    "test:moderation": "vitest run src/__tests__/moderation.suite.test.tsx",
+    "test:configuration": "vitest run src/__tests__/configuration.suite.test.tsx",
+    "test:finance": "vitest run src/__tests__/finance.suite.test.tsx",
+    "test:security": "vitest run src/__tests__/security.suite.test.tsx",
     "lint": "eslint src --ext ts,tsx"
   },
   "dependencies": {

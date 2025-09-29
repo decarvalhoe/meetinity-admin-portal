@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as matchers from '@testing-library/jest-dom/matchers'
+import { createMockWebSocket } from './utils/networkMocks'
 
 vi.mock('../services/eventService', () => ({
   EventService: {
@@ -24,15 +25,9 @@ vi.mock('../services/eventService', () => ({
   }
 }))
 
-vi.mock('../hooks/useWebSocket', () => ({
-  useWebSocket: () => ({
-    readyState: 3,
-    connectionAttempts: 0,
-    subscribe: () => () => {},
-    send: vi.fn(),
-    close: vi.fn()
-  })
-}))
+const { module: eventWebSocketModule } = createMockWebSocket({ readyState: 3 })
+
+vi.mock('../hooks/useWebSocket', () => eventWebSocketModule)
 
 expect.extend(matchers)
 
